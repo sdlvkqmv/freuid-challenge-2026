@@ -1,9 +1,38 @@
-# data
-public_test/
+# --- Competition data (downloaded, large; never commit) ---
+data/
 *.zip
 *.jpeg
 *.jpg
 *.png
 sample_submission.csv
+train_labels.csv
+train_sample_labels.csv
+
+# --- Python ---
 __pycache__/
+*.py[cod]
+*.egg-info/
 .ipynb_checkpoints/
+.venv/
+venv/
+
+# --- ML artifacts ---
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.h5
+wandb/
+runs/
+outputs/
+checkpoints/
+lightning_logs/
+
+# --- Submissions ---
+submission*.csv
+submissions/
+
+# --- OS/editor ---
+.DS_Store
+.idea/
+.vscode/
