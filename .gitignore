@@ -1,0 +1,9 @@
+# data
+public_test/
+*.zip
+*.jpeg
+*.jpg
+*.png
+sample_submission.csv
+__pycache__/
+.ipynb_checkpoints/
