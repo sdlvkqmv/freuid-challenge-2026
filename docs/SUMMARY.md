@@ -39,16 +39,19 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 
 ## Scoreboard (local proxy = val FREUID, stratified fold0; lower better)
 
-| Rank | Attempt | val FREUID (in-domain) | Kaggle public LB | Notes |
+| Rank (by LB) | Attempt | val FREUID (in-domain) | **Kaggle public LB** | Notes |
 |---|---|---|---|---|
-| ✅ submitted | 02 effb3 rgb+srm | 0.00011 | **0.18471** | best in-domain; **collapsed on real test** |
-| — | 01 effb3 rgb       | 0.00013 | (not submitted) | doc baseline; OOF tied w/ 02 |
-| — | 03 convnext rgb    | 0.18008 | — | **under-converged** (loss 0.33, lr too high); excluded |
-| — | 04 ensemble (rank) | 01+02=0.000117; +03=0.000190 | — | fusion **no in-domain gain** (saturated); convnext hurts |
+| 🥇 1 | 01 effb3 rgb       | 0.00013 | **0.17920** | best LB; RGB generalized best |
+| 2 | 02 effb3 rgb+srm   | 0.00011 | 0.18471 | best in-domain, **worse on LB** than RGB |
+| 3 | 03 convnext rgb    | 0.18008 | 0.35407 | under-converged (loss 0.33, lr too high) |
+| — | 04 ensemble (rank) | 01+02=0.000117; +03=0.000190 | (not submitted) | no in-domain gain; convnext hurts |
 
-**val ≠ LB by 1700× (0.00011 vs 0.18471)** — the proxy is broken (finding #0). The single
-submission burned tells us: this domain gap, not model capacity, is the bottleneck.
-SRM marginally beat RGB in-domain (AuDET 5.9e-5 vs 9.2e-5) but that signal is untrustworthy now.
+**val ≠ LB by ~1400× and the order REVERSES.** In-domain rank: 02 < 01 < 03. LB rank: 01 < 02 < 03.
+- SRM's in-domain edge (02 best) **did not transfer** — RGB (01) wins on the real test.
+- Proxy is not just optimistic, it's **anti-correlated at the top** → finding #0. Never pick by
+  stratified val. convnext's in-domain badness *did* predict its LB badness (loss-not-converged
+  shows up everywhere), but among the good models the proxy lies.
+- All ~0.18–0.35 vs LB top ~0.00063 → domain gap, not capacity, dominates.
 
 ## Local proxy formula
 

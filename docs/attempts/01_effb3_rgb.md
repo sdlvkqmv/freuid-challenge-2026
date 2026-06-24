@@ -21,10 +21,12 @@ the pipeline and the local FREUID proxy before adding forensic streams.
 | val FREUID (in-domain, stratified f0) | 0.00013 (best epoch 4) |
 | val AuDET | 9.17e-5 |
 | val APCER@1%BPCER | 1.70e-4 |
-| Kaggle LB | not submitted (02 was the better single; 1 sub/day spent on it) |
+| **Kaggle public LB** | **0.17920** (`submission 54013109`) — **best of all attempts** |
 
-Slightly worse than [02 effb3+SRM](02_effb3_srm.md) in-domain (0.00013 vs 0.00011). Subject to the
-same domain-gap caveat — in-domain near-zero is untrustworthy (finding #0 in [[SUMMARY]]).
+Worse than [02 effb3+SRM](02_effb3_srm.md) in-domain (0.00013 vs 0.00011) but **better on the LB**
+(0.17920 vs 0.18471). The in-domain ranking *reversed* on the real test — plain RGB generalized
+better than RGB+SRM. Confirms the proxy is anti-correlated at the top (finding #0 in [[SUMMARY]]):
+the SRM stream apparently latched onto digital-domain noise cues that don't survive recapture.
 
 ## Notes
 - bs had to drop 48→24 for 10GB at 384px. If throughput-bound, try 320px bs48 or grad-accum.

@@ -19,9 +19,12 @@ SRM high-pass residual is the cheapest such stream (fixed conv, no extra trainin
 | val FREUID (in-domain, stratified f0) | **0.00011** (best epoch 4) |
 | val AuDET | 5.90e-5 |
 | val APCER@1%BPCER | 1.70e-4 |
-| **Kaggle public LB** | **0.18471** (`submission 54012138`) |
+| **Kaggle public LB** | **0.18471** (`submission 54012138`) — 2nd, beaten by plain RGB (01=0.17920) |
 
-**In-domain best, but collapsed on the real public test (0.00011 → 0.18471, ~1700×).**
+**In-domain best, but collapsed on the real public test (0.00011 → 0.18471, ~1700×) — and on the
+LB it LOST to plain RGB ([01](01_effb3_rgb.md) 0.17920).** SRM's in-domain edge was on digital-domain
+noise that does not survive print-and-capture. SRM is not helping here; revisit only with recapture
+augmentation + an OOD proxy.
 This single submission produced the project's central finding (#0 in [[SUMMARY]]):
 - Train is 69,332 digital / **20 recaptured**; the test emphasizes **print-and-capture** images.
 - The model never learned the recapture domain → its near-perfect in-domain score is a shortcut.

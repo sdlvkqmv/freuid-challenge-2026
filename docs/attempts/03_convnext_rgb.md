@@ -19,6 +19,7 @@ differently from EfficientNet so rank-fusion (attempt 04) gains from decorrelate
 | val AuDET | 0.0774 |
 | val APCER@1%BPCER | 0.262 |
 | train_loss (final) | 0.326 (vs effb3 0.006) |
+| **Kaggle public LB** | **0.35407** (`submission 54013119`) — worst of all attempts |
 
 **Under-converged** — final train_loss 0.326 vs effb3's 0.006. `convnext_tiny` needs a lower LR /
 layer-wise decay than the shared `lr=3e-4` recipe; at this LR it barely trained. Excluded from the
