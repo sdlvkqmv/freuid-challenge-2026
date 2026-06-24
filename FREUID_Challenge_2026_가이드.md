@@ -62,7 +62,22 @@
   - APCER = Attack Presentation Classification Error Rate (위조를 진짜로 오판)
   - BPCER = Bona-Fide Presentation Classification Error Rate (진짜를 위조로 오판)
 - **Public 검증 리더보드** + **Private 비공개 테스트셋**으로 최종 순위.
-- 참고: 현재 리더보드 상위 점수 ~0.0006 수준 (낮을수록 상위).
+- 참고: 현재 Public 리더보드 상위 점수 ~0.0006 수준 (낮을수록 상위).
+
+The score combines:
+
+- AuDET: Area under the Detection Error Trade-off curve. This measures the trade-off between false accepts and false rejects across all decision thresholds.
+- APCER @ 1% BPCER: Attack Presentation Classification Error Rate measured at a fixed 1% Bona-Fide Presentation Classification Error Rate. This captures performance at a strict false-alarm operating point.
+- Both components are bounded in [0, 1], where lower is better. The final FREUID Score converts each component to a "goodness" score and takes their harmonic mean:
+
+```python
+g_audet = 1 - AuDET
+g_apcer = 1 - APCER@1%BPCER
+FREUID  = 1 - 2 * g_audet * g_apcer / (g_audet + g_apcer)
+```
+The combined score is also bounded in [0, 1], and lower is better.
+
+This combination rewards methods that perform well both globally and at the strict operating point. A model that performs well on the overall curve but fails at 1% BPCER will be penalized.
 
 ---
 
@@ -78,9 +93,9 @@
 ### 제출 형식 (`sample_submission.csv`)
 ```csv
 id,label
-0009cd06cf8c426789aa58b2b05c60d2,0
-000c9f83f98c4babac3f030df5300a8e,0
-...
+000001,0.0123
+000002,0.8741
+000003,0.4310
 ```
 - `id` = 이미지 파일 해시 (확장자 제외)
 - `label` = 위조 점수/확률 (DET 곡선 계산용 연속값 권장; 1=fraud, 0=bona-fide 방향)
