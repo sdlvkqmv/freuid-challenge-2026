@@ -17,6 +17,7 @@ __pycache__/
 venv/
 
 # --- ML artifacts ---
+experiments/
 *.ckpt
 *.pt
 *.pth
@@ -36,3 +37,6 @@ submissions/
 .DS_Store
 .idea/
 .vscode/
+
+# Claude Code local
+.claude/

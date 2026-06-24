@@ -1,0 +1,50 @@
+# FREUID baseline config — single source of truth for an experiment.
+# Override any field at CLI: python -m freuid.train --config configs/baseline.yaml --set train.epochs=10 model.name=convnext_tiny
+
+seed: 42
+
+paths:
+  data_root: data/extracted        # contains train/train, public_test/public_test, *.csv
+  exp_root: experiments            # per-run output dir created under here
+
+exp_name: baseline_effb0           # run folder = <exp_root>/<exp_name>_<timestamp>
+
+model:
+  name: tf_efficientnet_b0         # any timm model id
+  pretrained: true
+  drop_rate: 0.2
+  drop_path_rate: 0.1
+  streams: [rgb]                   # subset of [rgb, srm] (SRM noise residual)
+
+data:
+  img_size: 384
+  batch_size: 64
+  num_workers: 8
+  # light aug; ID docs -> avoid aggressive geometric distortion
+  rrc_scale: [0.7, 1.0]
+  hflip: false                     # text mirrors under hflip; off by default
+  color_jitter: 0.1
+
+val:
+  scheme: stratified               # stratified | group_holdout
+  n_folds: 5
+  fold: 0
+  holdout_types: []                # group_holdout: e.g. ["MOZAMBIQUE/DL"] held out as OOD val
+
+train:
+  epochs: 5
+  lr: 3.0e-4
+  weight_decay: 0.05
+  warmup_epochs: 1
+  amp: true
+  pos_weight: null                 # null -> auto (n_neg/n_pos); or a float
+  grad_clip: 1.0
+  early_stop_patience: 3
+  log_every: 50
+
+predict:
+  fill_value: 0.5                  # test ids in sample_submission with no image yet
+  tta_hflip: false
+
+device: cuda
+gpu: 0                             # cuda device index
