@@ -26,7 +26,13 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
    **⇒ Stratified CV is worthless as a proxy. Must validate on a recapture/OOD holdout.**
    (LB top ~0.00063; our 0.18 is far down.) → [[eval_harness]], [[attempts/02_effb3_srm]]
 
-1. **Calibration is a no-op for this metric.** AuDET and APCER@1%BPCER are computed by
+1. **🟢 SRM × recapture synergy (best lever so far).** Recapture augmentation improved the SRM
+   model (0.18471→**0.15185**) but *hurt* plain RGB (0.17920→0.18433). Neither piece alone helps;
+   together they do. Interpretation: SRM noise-residual cues are only discriminative once the input
+   distribution includes recapture artifacts, and recapture aug needs a forensic stream to be
+   exploited. → push this combo (stronger/longer). [[attempts/06_effb3_srm_recap]]
+
+2. **Calibration is a no-op for this metric.** AuDET and APCER@1%BPCER are computed by
    sweeping thresholds over submitted scores → any *monotonic* transform (isotonic/Platt/
    temperature) leaves both unchanged. The research doc's "calibration is the bottleneck"
    applies to fixed-0.5-threshold F1 benchmarks, NOT to DET-based AuDET. **The lever is
@@ -39,19 +45,22 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 
 ## Scoreboard (local proxy = val FREUID, stratified fold0; lower better)
 
-| Rank (by LB) | Attempt | val FREUID (in-domain) | **Kaggle public LB** | Notes |
-|---|---|---|---|---|
-| 🥇 1 | 01 effb3 rgb       | 0.00013 | **0.17920** | best LB; RGB generalized best |
-| 2 | 02 effb3 rgb+srm   | 0.00011 | 0.18471 | best in-domain, **worse on LB** than RGB |
-| 3 | 03 convnext rgb    | 0.18008 | 0.35407 | under-converged (loss 0.33, lr too high) |
-| — | 04 ensemble (rank) | 01+02=0.000117; +03=0.000190 | (not submitted) | no in-domain gain; convnext hurts |
+| Rank (by LB) | Attempt | val FREUID (in-domain) | recap-val | **Kaggle public LB** | Notes |
+|---|---|---|---|---|---|
+| 🥇 1 | 06 effb3 srm + recapture | 0.00018 | 0.00042 | **0.15185** | **best — SRM×recapture synergy** |
+| 2 | 01 effb3 rgb       | 0.00013 | — | 0.17920 | prior best |
+| 3 | 05 effb3 rgb + recapture | 0.00012 | 0.00022 | 0.18433 | recapture **didn't help RGB** |
+| 4 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
+| 5 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
+| — | 04 ensemble (rank) | 01+02=0.000117 | — | (not submitted) | no in-domain gain |
 
-**val ≠ LB by ~1400× and the order REVERSES.** In-domain rank: 02 < 01 < 03. LB rank: 01 < 02 < 03.
-- SRM's in-domain edge (02 best) **did not transfer** — RGB (01) wins on the real test.
-- Proxy is not just optimistic, it's **anti-correlated at the top** → finding #0. Never pick by
-  stratified val. convnext's in-domain badness *did* predict its LB badness (loss-not-converged
-  shows up everywhere), but among the good models the proxy lies.
-- All ~0.18–0.35 vs LB top ~0.00063 → domain gap, not capacity, dominates.
+**Best 0.17920 → 0.15185 (~15% rel) via recapture augmentation on the SRM stream.**
+- **Recapture aug helps SRM, not RGB**: 02→06 (0.18471→0.15185) improved; 01→05 (0.17920→0.18433)
+  regressed. **Synergy (root finding #1):** the noise stream only pays off once the model sees the
+  recapture domain; recapture aug only pays off if there's a forensic stream to exploit it.
+- Proxies still mis-rank at fine grain: in-domain rank 02<05<01<06, recap-val rank 05<06 — but LB
+  rank 06<01<05<02. **Coarsely** the recapture *family* won; absolute proxy values remain untrustworthy.
+- Still far from LB top ~0.00063 → keep closing the domain gap.
 
 ## Local proxy formula
 
@@ -64,26 +73,29 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 
 | # | File | Status |
 |---|---|---|
-| 01 | [effb3 rgb baseline](attempts/01_effb3_rgb.md) | running |
-| 02 | [effb3 + SRM noise stream](attempts/02_effb3_srm.md) | running |
-| 03 | [convnext_tiny rgb](attempts/03_convnext_rgb.md) | running |
-| 04 | [rank-fusion ensemble](attempts/04_ensemble.md) | pending |
+| 01 | [effb3 rgb baseline](attempts/01_effb3_rgb.md) | done · LB 0.17920 |
+| 02 | [effb3 + SRM noise stream](attempts/02_effb3_srm.md) | done · LB 0.18471 |
+| 03 | [convnext_tiny rgb](attempts/03_convnext_rgb.md) | done · LB 0.35407 |
+| 04 | [rank-fusion ensemble](attempts/04_ensemble.md) | not submitted |
+| 05 | [effb3 rgb + recapture](attempts/05_effb3_rgb_recap.md) | done · LB 0.18433 |
+| 06 | [effb3 SRM + recapture](attempts/06_effb3_srm_recap.md) | **done · LB 0.15185 🥇** |
 
 ## Remaining directions (re-prioritized after finding #0)
 
-**Top priority — close the digital→recapture domain gap (this is what lost 0.18 vs 0.0001):**
-1. **Heavy print-recapture / JPEG / moiré / resize augmentation** on the all-digital train set so
-   the model sees recapture-like artifacts (research §4). Cheapest lever against the gap.
-2. **Build a recapture/OOD validation holdout** so the proxy tracks LB. Options: the 20
-   `is_digital=False` train rows as a (tiny) probe; or hold out a whole doc `type`
-   (`val.scheme=group_holdout`) to at least catch cross-type collapse. Current stratified CV lies.
-3. **Forensic streams that target recapture** (NoisePrint++/PRNU camera-fingerprint, DCT double-JPEG)
-   — recapture = a second capture pipeline, exactly what these detect (§2, §4).
+**✅ DONE: recapture augmentation → new best 0.15185 (attempt 06, SRM stream only).**
 
-**Then (capacity / standard):**
-- DCT/JPEG-artifact stream (CAT-Net) · ROI face/text crops (YOLO, §6 biggest single jump) ·
-  diffusion reconstruction-error branch (DIRE/FIRE, §3 — GenAI family).
-- Re-converge convnext (lower lr / layer-decay) only if a *trustworthy* proxy says diversity helps.
+**Top priority — push the SRM×recapture winner (finding #1):**
+1. **Stronger / longer recapture training** on the SRM model: more epochs, higher recapture `prob`,
+   wider artifact ranges, maybe higher resolution. 06 was only 6 epochs / 384px.
+2. **Add a DCT / JPEG-artifact stream** (CAT-Net, §2) alongside RGB+SRM — double-JPEG is a core
+   recapture signature; complementary to SRM.
+3. **A real recapture validation probe** so the proxy stops lying: use the 20 `is_digital=False`
+   train rows held out, and/or `group_holdout` by doc type. recap-sim proxy is circular.
+
+**Then:**
+- ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch
+  (DIRE/FIRE, §3 GenAI family) · ensemble of diverse recapture-trained streams.
+- Re-converge convnext (lower lr / layer-decay) only if a trustworthy proxy says diversity helps.
 
 ## Pointers
 
