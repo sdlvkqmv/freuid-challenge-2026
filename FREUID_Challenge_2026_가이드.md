@@ -81,24 +81,72 @@ This combination rewards methods that perform well both globally and at the stri
 
 ---
 
-## 4. 데이터셋 & 제출 형식
+## 4. Dataset Description
+The FREUID dataset is a proprietary collection of high-fidelity bona-fide and fraudulent identity document samples contributed by the Microblink Fraud Lab. It is designed to benchmark fraud detection systems under a more realistic threat model than purely digital manipulation datasets.
 
-### 데이터셋 (FREUID)
-- Microblink Fraud Lab 제공 독점 컬렉션. 진본(bona-fide) + 위조(fraudulent) 문서.
-- **7개 문서 타입** (아시아·아프리카권), 다국어 스크립트 (라틴, 아랍).
-- 합성 데이터 + 인쇄/촬영된 플라스틱 카드 포함.
-- **전체 데이터셋 공개: 6월 초** (현재 일부 샘플 제공).
-- Kaggle 파일 구조: `public_test/public_test/<hash>.jpeg` (테스트 이미지 다수) 등.
+Each sample represents an identity document image. The task is binary fraud detection:
 
-### 제출 형식 (`sample_submission.csv`)
+- 0 - bona-fide / genuine document
+- 1 - attack / fraudulent document
+Fraudulent examples are designed to cover a broad attack surface, including:
+
+- Physical manipulations on printed and captured document substrates;
+- GenAI-driven multimodal edits created with accessible text-and-image tools;
+- Print-and-capture forgeries that suppress many fragile digital artifacts and close the "analog hole";
+- combinations of physical, digital and recapture effects that require models to detect semantic, structural and physical inconsistencies rather than only pixel-level signatures.
+
+The dataset deliberately includes under-represented document types, scripts, layouts and languages to test cross-document generalization. Strong solutions should perform well across document domains rather than overfit to a small number of template-specific or generator-specific traces.
+
+### Files
+
+The competition data will contain labeled training examples and unlabeled test examples.
+
+- train/ - training document images.
+- test/ - test document images for which participants submit predictions.
+- train.csv - metadata for the training set, including the row id, image path, binary label, information if example is fully digital or recaptured and type of document.
+- test.csv - metadata for the test set, including the row id and image path.
+- sample_submission.csv - the required submission format.
+
+The row id column is the stable key used by Kaggle to align submissions with hidden labels during scoring.
+
+### Labels
+
+The column label indicates whether a document is bona-fide (value 0) or fraudulent (value 1) while is_digital column indicates if example is fully digital (value 1) or re-captured (printed + captured, value 0). Column type indicates type of document (in a format <country>/<document-type>):
+
 ```csv
+id,image_path,label,is_digital,type
+000001,train/000001.jpg,0,0,USA/DL
+000002,train/000002.jpg,1,0,SWITZERLAND/ID
+000003,train/000003.jpg,1,1,CROATIA/ID
+```
+
+Participants should treat label=1 as the positive class: an attack or fraudulent document.
+
+### Submission Format
+
+For every row in test.csv, submit one numeric fraud score. Higher values should indicate higher confidence that the document is fraudulent.
+
 id,label
 000001,0.0123
 000002,0.8741
 000003,0.4310
-```
-- `id` = 이미지 파일 해시 (확장자 제외)
-- `label` = 위조 점수/확률 (DET 곡선 계산용 연속값 권장; 1=fraud, 0=bona-fide 방향)
+Scores need to be calibrated probabilities within the range [0, 1]. The leaderboard metric uses the ranking and operating-point behavior of these scores through the FREUID Score, which combines AuDET with APCER at 1% BPCER.
+
+### Public and Private Leaderboards
+
+The public leaderboard is computed on a public validation subset of the hidden test labels so teams can iterate during the competition. The final ranking is computed on a held-out subset that is intended to measure true generalization.
+
+The public and private test splits are intentionally designed to measure out-of-distribution generalization, not only performance on document types and capture conditions seen during training.
+
+In particular, the private test set will include two document types that are not present in either the training data or the public test data. These unseen document types are part of the final evaluation so that the private leaderboard better reflects cross-document robustness rather than template-specific memorization.
+
+The test splits also place stronger emphasis on non-synthetic, captured examples. Participants should therefore expect the final evaluation to reward methods that generalize across realistic capture pipelines, document layouts, physical artifacts, and recapture effects, instead of relying only on synthetic or generator-specific visual traces.
+
+We encourage teams to treat the training and public test data as development signals for building robust fraud detectors, while keeping the main objective focused on OOD testing and generalization to new document domains.
+
+### External Data
+
+Publicly available external data and pre-trained models are allowed, provided their licenses permit use in this competition and all sources are cited in the team's report. Proprietary external data that is not freely accessible to other participants is not allowed.
 
 ---
 
