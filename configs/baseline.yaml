@@ -24,6 +24,12 @@ data:
   rrc_scale: [0.7, 1.0]
   hflip: false                     # text mirrors under hflip; off by default
   color_jitter: 0.1
+  # print-and-capture simulation (freuid/augment.py). null/omit to disable.
+  # When set, an extra recapture-simulated val is evaluated and used for model selection.
+  recapture: null
+  # example (attempt 05):
+  #   recapture: {prob: 0.7, downscale: [0.5,1.0], blur: [0.0,1.2], moire_p: 0.3,
+  #               gamma: [0.8,1.2], bright: [0.85,1.15], wb: 0.06, noise_std: [0,8], jpeg_q: [40,92]}
 
 val:
   scheme: stratified               # stratified | group_holdout

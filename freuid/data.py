@@ -11,6 +11,8 @@ from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
+from .augment import RecaptureSim
+
 # Note the doubled directory layout: <root>/train/train/<id>.jpeg
 _SUBDIR = {
     "train": "train/train",
@@ -58,19 +60,26 @@ def make_split(df: pd.DataFrame, cfg) -> pd.DataFrame:
     return df
 
 
-def build_transforms(cfg, train: bool):
+def build_transforms(cfg, train: bool, force_recapture: bool = False):
+    """force_recapture: apply recapture sim even on the val path (recapture-robustness probe)."""
     size = cfg.data.img_size
+    rc = cfg.data.get("recapture")
     if train:
         ops = [
             transforms.RandomResizedCrop(size, scale=tuple(cfg.data.rrc_scale), antialias=True),
         ]
         if cfg.data.hflip:
             ops.append(transforms.RandomHorizontalFlip())
+        if rc and rc.get("prob", 0) > 0:
+            ops.append(RecaptureSim(rc))           # print-and-capture artifacts
         if cfg.data.color_jitter:
             cj = cfg.data.color_jitter
             ops.append(transforms.ColorJitter(brightness=cj, contrast=cj, saturation=cj))
     else:
         ops = [transforms.Resize((size, size), antialias=True)]
+        if force_recapture and rc:
+            probe = dict(rc); probe["prob"] = 1.0   # always-on for the diagnostic
+            ops.append(RecaptureSim(probe))
     ops += [transforms.ToTensor(), transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)]
     return transforms.Compose(ops)
 
@@ -113,7 +122,12 @@ def make_loaders(df_split: pd.DataFrame, cfg):
     common = dict(num_workers=cfg.data.num_workers, pin_memory=True, persistent_workers=cfg.data.num_workers > 0)
     tr_loader = DataLoader(tr, batch_size=cfg.data.batch_size, shuffle=True, drop_last=True, **common)
     va_loader = DataLoader(va, batch_size=cfg.data.batch_size, shuffle=False, **common)
-    return tr_loader, va_loader, va_df
+    # recapture-simulated val: sensitive to print-and-capture robustness (clean val is broken, finding #0)
+    va_recap_loader = None
+    if cfg.data.get("recapture"):
+        va_rc = FraudDataset(va_df, root, "train", build_transforms(cfg, False, force_recapture=True), has_label=True)
+        va_recap_loader = DataLoader(va_rc, batch_size=cfg.data.batch_size, shuffle=False, **common)
+    return tr_loader, va_loader, va_recap_loader, va_df
 
 
 def list_available_test_ids(data_root: str) -> list[str]:

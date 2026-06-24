@@ -69,7 +69,9 @@ def main() -> None:
     log.info("run_dir=%s", run_dir)
     log.info("meta=%s", json.dumps(meta, ensure_ascii=False))
 
-    tr_loader, va_loader, va_df = make_loaders(df, cfg)
+    tr_loader, va_loader, va_recap_loader, va_df = make_loaders(df, cfg)
+    sel_key = "recap_freuid" if va_recap_loader is not None else "freuid"
+    log.info("model selection by: %s", sel_key)
     model = build_model(cfg).to(device)
 
     pw = cfg.train.pos_weight
@@ -83,7 +85,7 @@ def main() -> None:
     total_steps = steps_per_epoch * cfg.train.epochs
     warmup_steps = steps_per_epoch * cfg.train.warmup_epochs
 
-    history, best = [], {"freuid": float("inf"), "epoch": -1}
+    history, best = [], {"freuid": float("inf"), "recap_freuid": float("inf"), "epoch": -1}
     bad_epochs, gstep = 0, 0
 
     for epoch in range(cfg.train.epochs):
@@ -115,17 +117,23 @@ def main() -> None:
         sc = freuid_score(labels, probs)
         sc["epoch"] = epoch
         sc["train_loss"] = running / steps_per_epoch
+        if va_recap_loader is not None:
+            rprobs, rlabels = evaluate(model, va_recap_loader, device)
+            rsc = freuid_score(rlabels, rprobs)
+            sc["recap_freuid"] = rsc["freuid"]
+            sc["recap_audet"] = rsc["audet"]
+            sc["recap_apcer@1%bpcer"] = rsc["apcer@1%bpcer"]
         history.append(sc)
-        log.info("[val] epoch %d FREUID %.5f AuDET %.5f APCER@1%%BPCER %.5f",
-                 epoch, sc["freuid"], sc["audet"], sc["apcer@1%bpcer"])
+        log.info("[val] epoch %d FREUID %.5f | recap %.5f",
+                 epoch, sc["freuid"], sc.get("recap_freuid", float("nan")))
 
-        if sc["freuid"] < best["freuid"]:
-            best = {"freuid": sc["freuid"], "epoch": epoch, **sc}
+        if sc[sel_key] < best[sel_key]:
+            best = {"epoch": epoch, **sc}
             torch.save({"model": model.state_dict(), "cfg": dict(cfg), "score": sc},
                        run_dir / "checkpoints" / "best.pt")
             va_df.assign(prob=probs).to_csv(run_dir / "oof_val.csv", index=False)
             bad_epochs = 0
-            log.info("  -> new best FREUID %.5f (saved)", best["freuid"])
+            log.info("  -> new best %s %.5f (saved)", sel_key, best[sel_key])
         else:
             bad_epochs += 1
             if bad_epochs >= cfg.train.early_stop_patience:
@@ -134,7 +142,8 @@ def main() -> None:
 
     (run_dir / "metrics.json").write_text(
         json.dumps({"best": best, "history": history}, indent=2, ensure_ascii=False))
-    log.info("DONE best FREUID %.5f @ epoch %d | %s", best["freuid"], best["epoch"], run_dir)
+    log.info("DONE best FREUID %.5f (recap %.5f, sel=%s) @ epoch %d | %s",
+             best["freuid"], best.get("recap_freuid", float("nan")), sel_key, best["epoch"], run_dir)
     print(run_dir)  # stdout: run dir for downstream scripts
 
 
