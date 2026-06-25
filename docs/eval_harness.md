@@ -63,6 +63,31 @@ stratified CV (which is ~100% digital on both sides) cannot see the collapse. **
 by stratified val.** Build a recapture/OOD holdout (see [[SUMMARY]] remaining directions) before
 trusting any local number again.
 
+## 🔴 Measured: the "real recapture" probe is ALSO broken (`freuid/probe.py`)
+
+Direction tried (attempt 07/08 session): use the only non-simulated recapture data — the **20
+`is_digital=False` train rows** (14 fraud / 6 bona-fide) — as a real holdout proxy. Two killers:
+
+1. **n is hopeless for FREUID.** APCER@1%BPCER needs ~≥100 negatives; we have **6**. No stable
+   DET. So `probe.py` reports rank-separation (AUROC / score gap), not FREUID.
+2. **Even AUROC is inverted vs LB.** Measured on the saved runs:
+
+   | run | real-recap AUROC | real-recap gap | Kaggle LB |
+   |---|---|---|---|
+   | 01 effb3 rgb            | 1.0000 | 0.96 | 0.17920 |
+   | 02 effb3 srm            | 1.0000 | 0.95 | 0.18471 |
+   | 05 effb3 rgb+recap      | 1.0000 | 0.94 | 0.18433 |
+   | **06 effb3 srm+recap** 🥇 | **0.8869** | 0.69 | **0.15185 (best)** |
+
+   The **best LB model has the *lowest* probe AUROC.** Cause: the 20 rows leak into the stratified
+   train split (memorized → trivial 1.0), and recapture aug makes 06 see clean MAURITIUS inputs
+   differently. → **The real-recapture probe cannot rank either.** It is kept only as a collapse
+   alarm (a model scoring ≪0.7 is suspect), never for selection.
+
+**⇒ Conclusion after this session: NO local proxy (stratified, recap-sim, OR real-recapture)
+reliably ranks at the top. The public LB is the only trustworthy ranker. Spend the 5 daily
+submissions as the actual experiment loop; use proxies only to filter obvious failures.**
+
 ## Trusting the proxy
 
 - In-domain `stratified` proxy ≫ optimistic. Treat absolute numbers as upper bounds.
