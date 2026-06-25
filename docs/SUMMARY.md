@@ -47,14 +47,22 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 
 | Rank (by LB) | Attempt | val FREUID (in-domain) | recap-val | **Kaggle public LB** | Notes |
 |---|---|---|---|---|---|
-| 🥇 1 | 06 effb3 srm + recapture | 0.00018 | 0.00042 | **0.15185** | **best — SRM×recapture synergy** |
-| 2 | 01 effb3 rgb       | 0.00013 | — | 0.17920 | prior best |
-| 3 | 05 effb3 rgb + recapture | 0.00012 | 0.00022 | 0.18433 | recapture **didn't help RGB** |
-| 4 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
-| 5 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
+| 🥇 1 | 06 effb3 srm + recapture | 0.00018 | 0.00042 | **0.15185** | **best — SRM×recapture synergy, moderate aug** |
+| 2 | 10 fusion 2×06 + 1×07b | — | — | 0.15564 | fusion < 06 (07b correlated, weaker) |
+| 3 | 07b srm+recap 448 hi-res | 0.00022 | 0.00032 | 0.16440 | hi-res didn't help |
+| 4 | 01 effb3 rgb       | 0.00013 | — | 0.17920 | prior best |
+| 5 | 05 effb3 rgb + recapture | 0.00012 | 0.00022 | 0.18433 | recapture **didn't help RGB** |
+| 6 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
+| 7 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
+| 8 | 08 rgb+srm+dct (+strong aug) | 0.00032 | 0.00063 | 0.24078 | DCT confounded by bad aug → see 09 |
+| 9 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
 | — | 04 ensemble (rank) | 01+02=0.000117 | — | (not submitted) | no in-domain gain |
+| — | 09 rgb+srm+dct FAIR (06 aug) | — | — | (pending) | isolates DCT w/ moderate aug |
 
-**Best 0.17920 → 0.15185 (~15% rel) via recapture augmentation on the SRM stream.**
+**Best still 0.15185 (attempt 06).** Session 2 (2026-06-25): pushing the winner harder all regressed
+— stronger/wider aug (07a 0.19546), hi-res (07b 0.16440), DCT+bad-aug (08 0.24078), fusion (10 0.15564).
+→ **06's moderate-aug SRM+recapture is a local optimum; parameter pushes don't beat it. Need a
+different signal family (DCT-fair pending, then field-consistency D / ROI crops).**
 - **Recapture aug helps SRM, not RGB**: 02→06 (0.18471→0.15185) improved; 01→05 (0.17920→0.18433)
   regressed. **Synergy (root finding #1):** the noise stream only pays off once the model sees the
   recapture domain; recapture aug only pays off if there's a forensic stream to exploit it.
@@ -79,18 +87,24 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 | 04 | [rank-fusion ensemble](attempts/04_ensemble.md) | not submitted |
 | 05 | [effb3 rgb + recapture](attempts/05_effb3_rgb_recap.md) | done · LB 0.18433 |
 | 06 | [effb3 SRM + recapture](attempts/06_effb3_srm_recap.md) | **done · LB 0.15185 🥇** |
+| 07 | [push SRM×recapture (harder aug + hi-res)](attempts/07_srm_recap_push.md) | done · 07a 0.19546 / 07b 0.16440 |
+| 08 | [DCT block-frequency stream](attempts/08_dct_stream.md) | done · LB 0.24078 (confounded) |
+| 09 | [DCT-fair (06 moderate aug)](attempts/09_dct_fair.md) | pending |
+| 10 | [rank-fusion 06×07b](attempts/10_ensemble_06_07b.md) | done · LB 0.15564 |
 
 ## Remaining directions (re-prioritized after finding #0)
 
 **✅ DONE: recapture augmentation → new best 0.15185 (attempt 06, SRM stream only).**
 
-**Top priority — push the SRM×recapture winner (finding #1):**
-1. **Stronger / longer recapture training** on the SRM model: more epochs, higher recapture `prob`,
-   wider artifact ranges, maybe higher resolution. 06 was only 6 epochs / 384px.
-2. **Add a DCT / JPEG-artifact stream** (CAT-Net, §2) alongside RGB+SRM — double-JPEG is a core
-   recapture signature; complementary to SRM.
-3. **A real recapture validation probe** so the proxy stops lying: use the 20 `is_digital=False`
-   train rows held out, and/or `group_holdout` by doc type. recap-sim proxy is circular.
+**❌ EXHAUSTED (session 2, all regressed vs 06) — parameter pushes don't beat the winner:**
+1. ~~Stronger/longer/wider recapture aug~~ → 07a 0.19546 (over-aug HURTS), 07b 448px 0.16440 (hi-res
+   neutral-worse). **06's moderate prob-0.7 aug is a local optimum.** [[attempts/07_srm_recap_push]]
+2. **DCT/JPEG stream** → 08 0.24078 but **confounded** by the bad strong-aug; [[attempts/09_dct_fair]]
+   (DCT + 06's moderate aug) is the clean test — *pending*.
+3. ~~Real recapture validation probe~~ → built (`freuid/probe.py`) but **also broken**: n=20 too
+   small for FREUID, AUROC inverted vs LB. No local proxy ranks at the top. [[eval_harness]]
+
+**⇒ Next must change the SIGNAL FAMILY, not the knobs:**
 
 **Then:**
 - ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch

@@ -1,0 +1,60 @@
+# Attempt 09 — fair DCT test: rgb+srm+dct with attempt06's MODERATE recapture aug.
+# attempt08 (DCT) regressed but used the strong/wide aug (prob0.85) that 07a proved harmful
+# on its own → DCT was confounded. This isolates DCT by reusing 06's exact aug + schedule.
+
+seed: 42
+
+paths:
+  data_root: data/extracted
+  exp_root: experiments
+
+exp_name: rgb_srm_dct_recap_fair
+
+model:
+  name: tf_efficientnet_b3
+  pretrained: true
+  drop_rate: 0.2
+  drop_path_rate: 0.1
+  streams: [rgb, srm, dct]
+
+data:
+  img_size: 384
+  batch_size: 24
+  num_workers: 8
+  rrc_scale: [0.7, 1.0]
+  hflip: false
+  color_jitter: 0.1
+  recapture:                         # attempt06 settings (prob 0.7, narrow ranges)
+    prob: 0.7
+    downscale: [0.5, 1.0]
+    blur: [0.0, 1.2]
+    moire_p: 0.3
+    gamma: [0.8, 1.2]
+    bright: [0.85, 1.15]
+    wb: 0.06
+    noise_std: [0.0, 8.0]
+    jpeg_q: [40, 92]
+
+val:
+  scheme: stratified
+  n_folds: 5
+  fold: 0
+  holdout_types: []
+
+train:
+  epochs: 8
+  lr: 3.0e-4
+  weight_decay: 0.05
+  warmup_epochs: 1
+  amp: true
+  pos_weight: null
+  grad_clip: 1.0
+  early_stop_patience: 3
+  log_every: 100
+
+predict:
+  fill_value: 0.5
+  tta_hflip: false
+
+device: cuda
+gpu: 0
