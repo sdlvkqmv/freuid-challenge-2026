@@ -55,14 +55,15 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 | 6 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
 | 7 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
 | 8 | 08 rgb+srm+dct (+strong aug) | 0.00032 | 0.00063 | 0.24078 | DCT confounded by bad aug → see 09 |
-| 9 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
+| 9 | 09 rgb+srm+dct FAIR (06 aug) | 0.00011 | 0.00021 | 0.21476 | **DCT stream genuinely hurts** (clean test) |
+| 10 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
 | — | 04 ensemble (rank) | 01+02=0.000117 | — | (not submitted) | no in-domain gain |
-| — | 09 rgb+srm+dct FAIR (06 aug) | — | — | (pending) | isolates DCT w/ moderate aug |
 
-**Best still 0.15185 (attempt 06).** Session 2 (2026-06-25): pushing the winner harder all regressed
-— stronger/wider aug (07a 0.19546), hi-res (07b 0.16440), DCT+bad-aug (08 0.24078), fusion (10 0.15564).
-→ **06's moderate-aug SRM+recapture is a local optimum; parameter pushes don't beat it. Need a
-different signal family (DCT-fair pending, then field-consistency D / ROI crops).**
+**Best still 0.15185 (attempt 06).** Session 2 (2026-06-25), all 5 subs spent, **everything regressed**:
+stronger/wider aug (07a 0.19546), hi-res (07b 0.16440), DCT+bad-aug (08 0.24078), DCT-fair (09 0.21476),
+fusion (10 0.15564). → **06's moderate-aug SRM+recapture is a local optimum; neither hyperparameter
+pushes nor extra pixel streams (DCT) beat it. Next lever must change the signal family —
+field-consistency D / ROI crops.**
 - **Recapture aug helps SRM, not RGB**: 02→06 (0.18471→0.15185) improved; 01→05 (0.17920→0.18433)
   regressed. **Synergy (root finding #1):** the noise stream only pays off once the model sees the
   recapture domain; recapture aug only pays off if there's a forensic stream to exploit it.
@@ -99,8 +100,8 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 **❌ EXHAUSTED (session 2, all regressed vs 06) — parameter pushes don't beat the winner:**
 1. ~~Stronger/longer/wider recapture aug~~ → 07a 0.19546 (over-aug HURTS), 07b 448px 0.16440 (hi-res
    neutral-worse). **06's moderate prob-0.7 aug is a local optimum.** [[attempts/07_srm_recap_push]]
-2. **DCT/JPEG stream** → 08 0.24078 but **confounded** by the bad strong-aug; [[attempts/09_dct_fair]]
-   (DCT + 06's moderate aug) is the clean test — *pending*.
+2. ~~DCT/JPEG stream~~ → 08 0.24078 (confounded), **09 FAIR test 0.21476** with 06's moderate aug →
+   **DCT stream genuinely hurts, dropped.** SRM is the forensic stream that works. [[attempts/09_dct_fair]]
 3. ~~Real recapture validation probe~~ → built (`freuid/probe.py`) but **also broken**: n=20 too
    small for FREUID, AUROC inverted vs LB. No local proxy ranks at the top. [[eval_harness]]
 
