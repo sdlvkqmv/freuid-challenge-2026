@@ -26,6 +26,50 @@ Why it survives the domain gap: it keys on **semantic/structural** breakage, not
 
 Tampered region is a tiny fraction of pixels; global pooling dilutes it. Per-field (or per-patch) score → **max-aggregate** instead of global average. Complements ROI crops already on the plan; cheap to bolt onto the existing backbone.
 
+# Domain-gap attacks (added 2026-06-25)
+
+The whole game is the train→test domain gap (train ~100% digital edits; test = recapture + private unseen types/generators). Only proven lever so far: forensic-stream × recapture-aug **synergy** (SUMMARY finding #1). D/E above add orthogonal signal; F–J below attack the gap *directly* — most planned items (DCT, ROI, DIRE) do not. Generated via negation + adjacent-possible + reformulation.
+
+## F. Frozen foundation features (CLIP / DINOv2 linear-probe or LoRA) — top bet
+
+> From-scratch EffNet-B3 overfits the digital domain and collapses on unseen generators/types, which is exactly the private-LB objective. Freeze a large pretrained vision encoder and train only a light head, because such features generalize to unseen forgery generators where trained-from-scratch CNNs do not.
+
+Precedent: **UnivFD** (Ojha et al., frozen CLIP + linear probe) beats trained CNNs on *unseen* deepfake generators. Cheap: backbone frozen, train head (or LoRA adapters). Highest leverage vs the actual (OOD) objective.
+- **Pilot:** frozen CLIP-ViT-L/14 (and DINOv2-L) → global feature → logistic / 1-layer MLP head, train on full train set. Measure recap-val + LB. Then LoRA the top blocks if linear-probe underfits. ~1 day.
+
+## G. Test-time BN / domain adaptation — cheapest, do first
+
+> Covariate shift between digital train and recapture test is the core failure, and the best model never updates its feature statistics for the test domain. Recompute BatchNorm running stats (or entropy-minimize) on the unlabeled test batch, because that re-aligns features to the recapture domain with no retraining.
+
+Unsupervised, no labels, hours. Bolt onto the 06 winner.
+- **Pilot:** at inference, switch BN to use test-batch stats (or Tent: entropy-min over BN affine params, 1–10 steps). Apply to attempt-06 checkpoint. Compare LB vs frozen-stat baseline. Risk: low. Half day.
+
+## H. One-class / anomaly on bona-fide — reframe (F2)
+
+> A discriminative fraud-vs-genuine boundary fits the digital-edit family and won't transfer to the private LB's unseen forgery types. Model only the abundant bona-fide distribution (40k) and score deviation, because genuine documents are far more constrained than the open-ended set of forgery families and a deviation score generalizes to forgery types never seen in training.
+
+Hedges the unseen-type private LB. Medium effort.
+- **Pilot:** features from F (frozen encoder) → fit one-class (Mahalanobis / kNN-distance / deep-SVDD) on bona-fide only → distance = fraud score. Score-fuse late with 06. Measure recap-val + LB.
+
+## I. Operating-point-aware hard-negative mining
+
+> The metric's second term is APCER@**1%**BPCER, dominated by the worst ~1% of bona-fide (the false-positive tail), and calibration provably cannot move it (finding #2) — only ranking near the operating point can. Mine the hard bona-fide that sit near the threshold and up-weight loss there, because that sharpens exactly the ranking region the metric scores.
+
+Targets the lever the calibration no-op leaves open. Cheap-ish add to any backbone.
+- **Pilot:** train run with hard-negative reweighting (focal or top-k-hardest-bona-fide boosting) on the 06 recipe. Measure APCER@1%BPCER specifically on recap-val + LB.
+
+## J. Domain-adversarial (DANN / gradient reversal) on `is_digital` — hedge
+
+> The model keys on digital-domain artifacts that vanish under recapture. Add a gradient-reversal adversary predicting digital-vs-recapture, because forcing the backbone to be recapture-invariant removes the shortcut that breaks OOD.
+
+Riskier — can erase fraud signal with the domain signal. Try only if G/H stall.
+- **Pilot:** DANN head on `is_digital` (use recap-aug to create the recapture class since train has only 20 real). Tune adversary weight. Measure recap-val + LB.
+
 ## Priority
 
-Field-consistency (D) is the strongest net-new bet — orthogonal signal, domain-gap-robust, cheap. Per-type normalization and max-agg are low-cost experiments to slot between the SUMMARY-priority items.
+1. **G** (test-time BN) — cheapest, do first, free insurance on the 06 winner.
+2. **F** (frozen foundation features) — biggest OOD upside; only candidate whose precedent is literally "generalizes to unseen generators."
+3. **D** (field-consistency) — strongest orthogonal-signal net-new, domain-gap-robust, cheap; fuse late.
+4. **I** (op-point hard-neg mining) — metric squeeze once a backbone wins.
+5. **H / J** — hedges for the unseen-type private LB; run if F/G plateau.
+E (max-agg) + per-type norm remain low-cost experiments to slot between SUMMARY-priority items.
