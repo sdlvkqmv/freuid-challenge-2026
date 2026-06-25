@@ -105,7 +105,16 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 3. ~~Real recapture validation probe~~ → built (`freuid/probe.py`) but **also broken**: n=20 too
    small for FREUID, AUROC inverted vs LB. No local proxy ranks at the top. [[eval_harness]]
 
-**⇒ Next must change the SIGNAL FAMILY, not the knobs:**
+**⇒ Next must change the SIGNAL FAMILY, not the knobs. Tomorrow's order ([[research/directions]] F–J):**
+1. **G — test-time BN / Tent** (cheapest, hours): recompute BN stats / entropy-min on the unlabeled
+   test batch to re-align 06 to the recapture domain. No retraining, bolt onto the 06 checkpoint.
+   Free insurance — do first.
+2. **F — frozen foundation features** (biggest OOD upside): frozen CLIP-ViT-L/14 or DINOv2-L +
+   light head (linear probe → LoRA). Precedent (UnivFD) literally generalizes to *unseen* generators
+   = the private-LB objective. ~1 day.
+3. **D — field-consistency / MRZ checks** (strongest orthogonal net-new, domain-gap-robust); fuse late.
+4. **I — operating-point hard-negative mining** (metric squeeze on APCER@1%BPCER) once a backbone wins.
+5. **H / J** (one-class on bona-fide · domain-adversarial) — hedges for unseen-type private LB if F/G plateau.
 
 **Then:**
 - ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch
