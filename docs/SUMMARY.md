@@ -97,9 +97,21 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
   (DIRE/FIRE, §3 GenAI family) · ensemble of diverse recapture-trained streams.
 - Re-converge convnext (lower lr / layer-decay) only if a trustworthy proxy says diversity helps.
 
+**Net-new (see [[research/directions]]):**
+- **D. Field-consistency / cross-field semantic checks** (MRZ ICAO-9303 check digits, font/baseline,
+  logical issue≤expiry) — *strongest net-new bet*: a non-pixel signal orthogonal to RGB/SRM/DCT/DIRE,
+  **robust to the recapture domain gap** (keys on semantic breakage, not camera artifacts). Late
+  score-fuse with the SRM×recapture winner. Cost: OCR+MRZ infra (next big build, not today).
+- **Per-doc-type score normalization** — a *per-group* (non-global) transform is NOT a monotonic
+  no-op, so it CAN move the combined DET / APCER@1%BPCER by realigning per-type operating points.
+  Needs a doc-type classifier on test (test has no type labels); in-domain val is near-perfect so
+  **only LB-testable** → costs a submission. Slot in once a winner is fixed.
+- **E. Tiny-region max-aggregation** — per-patch/field score → max-pool (tampered region is tiny;
+  global pooling dilutes it). Bolt-on once ROI crops exist.
+
 ## Pointers
 
-- Research survey: [[research/forgery_detection]]
+- Research survey: [[research/forgery_detection]] · net-new ideas: [[research/directions]]
 - Eval harness detail: [[eval_harness]]
 - Code: `freuid/` (train/predict/ensemble), configs `configs/baseline.yaml`, runner `scripts/run_baseline.sh`.
 - Run outputs: `experiments/<name>_<ts>/` (config.yaml, meta.json, metrics.json, oof_val.csv, checkpoints/best.pt, submission.csv).
