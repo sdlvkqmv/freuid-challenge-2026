@@ -17,6 +17,7 @@
 2. **Noise-residual / camera-fingerprint streams beat raw RGB** for tamper cues. NoisePrint(++), guided-filter residuals, DCT/JPEG-artifact streams all add signal. [EdgeDoc, TruFor, CAT-Net, guided-noise]
 3. **Generalization gap is THE problem.** Models hit ~100% in-domain and collapse to ~50% cross-type / cross-nationality / cross-generator. The private test will punish overfit. Validate on held-out doc types & `is_digital` splits.
 4. **Calibration, not capacity, is the bottleneck** for the metric. AUC can be high while thresholded F1 is near-zero because tampered regions are tiny. Output well-calibrated continuous scores; tune the operating point. [DOCFORGE-BENCH]
+   - ⚠️ **Correction (verified on FREUID metric):** this applies to **fixed-0.5-threshold F1** benchmarks, NOT to FREUID's DET-based AuDET/APCER@1%BPCER. Those sweep thresholds over submitted scores, so any **global monotonic** calibration is a **no-op**. The lever is ranking quality + behavior near the 1%-BPCER point. See `SUMMARY.md` finding #2 and `directions.md`.
 5. **GAN-era and face-forgery detectors do NOT transfer to diffusion edits.** If the forgery family includes GenAI multimodal edits, use diffusion-aware detectors (reconstruction error / frequency). [DIRE, FIRE]
 6. **Ensemble/score-fusion of complementary detectors** (e.g. edge/noise model + transformer forensics model) beat either alone on the private split. [EdgeDoc+TruFor fusion]
 
