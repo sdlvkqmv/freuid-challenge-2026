@@ -51,11 +51,13 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 | 2 | 10 fusion 2×06 + 1×07b | — | — | 0.15564 | fusion < 06 (07b correlated, weaker) |
 | 3 | 11 G-AdaBN (06 ckpt + test-BN) | — | — | 0.15598 | test-time BN recompute ≈ no-op (06 already recap-trained) |
 | 4 | 11 G-Tent (06 ckpt, BN affine) | — | — | 0.15854 | entropy ~0 (overconfident) → drift, worse |
-| 5 | 07b srm+recap 448 hi-res | 0.00022 | 0.00032 | 0.16440 | hi-res didn't help |
+| 5 | 13 I-focal (hard-neg, gp2/gn3) | 0.00012 | 0.00033 | 0.16161 | hard-neg mining regresses (amplifies digital shortcut) |
+| 6 | 07b srm+recap 448 hi-res | 0.00022 | 0.00032 | 0.16440 | hi-res didn't help |
 | 4 | 01 effb3 rgb       | 0.00013 | — | 0.17920 | prior best |
 | 5 | 05 effb3 rgb + recapture | 0.00012 | 0.00022 | 0.18433 | recapture **didn't help RGB** |
 | 6 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
-| 7 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
+| 7 | 14 I-OHEM (hard-neg, top50%) | 0.00013 | 0.00032 | 0.18855 | OHEM most aggressive → worst hard-neg variant |
+| 8 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
 | 8 | 08 rgb+srm+dct (+strong aug) | 0.00032 | 0.00063 | 0.24078 | DCT confounded by bad aug → see 09 |
 | 9 | 09 rgb+srm+dct FAIR (06 aug) | 0.00011 | 0.00021 | 0.21476 | **DCT stream genuinely hurts** (clean test) |
 | 12 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
@@ -77,9 +79,16 @@ field-consistency D / ROI crops.**
   **low-level forensic** signal (noise/JPEG-grid/recapture traces) ID-forgery needs. UnivFD precedent
   is for *semantic* GAN/diffusion artifacts; physical+recapture ID forgery is a different family.
   Confirms research §1 (effb3 full-finetune ≫ frozen ViT). [[attempts/12_frozen_foundation]]
-- **⇒ Both confirm the same lesson: the winning recipe is a FULL fine-tune of a CNN with a forensic
-  stream (SRM) + recapture aug. The remaining lever is a NEW signal family added late-fused —
-  field-consistency D / ROI crops — not backbone swaps or post-hoc adaptation.**
+- **I operating-point hard-neg mining** (focal 0.16161, OHEM 0.18855): also FAILED. recap-val said
+  *better* than 06 yet LB worse — proxy lied again. Hard examples live in the **digital** train
+  domain → concentrating gradient there **amplifies the domain shortcut** and widens the train/test
+  gap. Metric-squeeze presumes good ranking; ranking is gated by the domain gap, not the operating
+  point. [[attempts/13_hardneg_mining]]
+- **⇒ Three directions (G, F, I) all confirm the same lesson: the winning recipe is a FULL fine-tune
+  of a CNN with a forensic stream (SRM) + recapture aug (06). Backbone swaps (F), post-hoc adaptation
+  (G), and loss reshaping (I) all fail. The ONLY remaining lever is a NEW signal family that is
+  itself less domain-gap-sensitive — ROI face/text crops + max-agg, or field-consistency — added
+  late-fused. Everything that reshapes the same digital-domain model is exhausted.**
 - **Recapture aug helps SRM, not RGB**: 02→06 (0.18471→0.15185) improved; 01→05 (0.17920→0.18433)
   regressed. **Synergy (root finding #1):** the noise stream only pays off once the model sees the
   recapture domain; recapture aug only pays off if there's a forensic stream to exploit it.
@@ -110,6 +119,7 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 | 10 | [rank-fusion 06×07b](attempts/10_ensemble_06_07b.md) | done · LB 0.15564 |
 | 11 | [G test-time AdaBN + Tent](attempts/11_tta_bn_tent.md) | done · AdaBN 0.15598 / Tent 0.15854 |
 | 12 | [F frozen CLIP/DINOv2](attempts/12_frozen_foundation.md) | killed ep2 · not submitted (frozen feats fail) |
+| 13/14 | [I hard-neg mining (focal/OHEM)](attempts/13_hardneg_mining.md) | done · focal 0.16161 / OHEM 0.18855 |
 
 ## Remaining directions (re-prioritized after finding #0)
 
@@ -127,14 +137,18 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 - ~~**G — test-time BN / Tent**~~ → DONE, FAILED (AdaBN 0.15598, Tent 0.15854). [[attempts/11_tta_bn_tent]]
 - ~~**F — frozen foundation features**~~ → DONE, FAILED (killed ep2, frozen semantic feats are the
   wrong signal family for low-level ID forgery). [[attempts/12_frozen_foundation]]
-1. **D — field-consistency / MRZ checks** ← NOW TOP. Strongest orthogonal net-new, domain-gap-robust
-   (keys on semantic breakage, not camera artifacts). Late score-fuse with 06. Cost: OCR+MRZ infra.
-2. **ROI face/text crops** (YOLO/heuristic, research §6 biggest single jump) + **E max-aggregation**
-   (tampered region is tiny; global pooling dilutes it). Same-family-as-06 but adds spatial focus.
-3. **I — operating-point hard-negative mining** (metric squeeze on APCER@1%BPCER) — bolt onto 06.
-4. **H / J** (one-class on bona-fide · domain-adversarial) — hedges for unseen-type private LB.
-- **Backbone swaps are exhausted**: full-finetune effb3+SRM (06) beats frozen ViT (F) and post-hoc
-  BN adaptation (G). Stay with the CNN+forensic-stream recipe; add NEW signals late-fused.
+- ~~**I — operating-point hard-neg mining**~~ → DONE, FAILED (focal 0.16161, OHEM 0.18855; amplifies
+  digital shortcut). [[attempts/13_hardneg_mining]]
+1. **ROI face/text crops** ← NOW TOP (research §6 biggest single jump) + **E max-aggregation**
+   (tampered region is tiny; global pooling dilutes it). Spatial focus is a *new signal* less tied to
+   global digital-domain texture, so plausibly more domain-gap-robust. Cost: face/text detector infra.
+2. **D — field-consistency** (font/baseline/layout consistency; MRZ weak here — dataset is 4 DLs + 1
+   ID, DLs lack MRZ). Orthogonal non-pixel signal, late-fuse with 06. Cost: OCR+layout infra.
+3. **H / J** (one-class on bona-fide · domain-adversarial) — hedges for unseen-type private LB.
+- **Everything that reshapes the same digital-domain model is exhausted**: backbone swap (F),
+  post-hoc BN adaptation (G), loss reshaping (I) all fail vs 06. Only a NEW, less-domain-gap-sensitive
+  signal family (ROI/spatial, field-consistency) is left. Stay on the CNN+SRM+recap recipe as the
+  fraud-texture member; ADD orthogonal members late-fused.
 
 **Then:**
 - ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch

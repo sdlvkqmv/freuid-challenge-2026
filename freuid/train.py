@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 
 from .config import dump_config, parse_args_and_config
 from .data import load_train_df, make_loaders, make_split
+from .losses import build_loss
 from .metrics import freuid_score
 from .model import build_model
 from .utils import device_from_cfg, get_logger, git_hash, make_run_dir, set_seed
@@ -77,7 +78,8 @@ def main() -> None:
     pw = cfg.train.pos_weight
     if pw is None:
         pw = (n_tr - n_pos) / max(1, n_pos)
-    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([float(pw)], device=device))
+    criterion = build_loss(cfg, float(pw))
+    log.info("loss: %s", cfg.train.get("loss") or "bce(pos_weight=%.3f)" % pw)
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr, weight_decay=cfg.train.weight_decay)
     scaler = torch.amp.GradScaler("cuda", enabled=cfg.train.amp and device.type == "cuda")
 
