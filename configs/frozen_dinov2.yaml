@@ -1,0 +1,51 @@
+seed: 42
+paths:
+  data_root: data/extracted
+  exp_root: experiments
+exp_name: attempt12_frozen_dinov2_mlp
+model:
+  name: vit_large_patch14_dinov2.lvd142m
+  pretrained: true
+  frozen: true
+  head: mlp
+  head_hidden: 512
+  drop_rate: 0.2
+  streams: [rgb]
+data:
+  img_size: 224                               # patch14 -> 16x16 tokens (pos-embed interpolated)
+  batch_size: 48
+  num_workers: 14
+  rrc_scale: [0.7, 1.0]
+  hflip: false
+  color_jitter: 0.1
+  # DINOv2 uses ImageNet normalization (data.py default) -> omit mean/std
+  recapture:
+    prob: 0.7
+    downscale: [0.5, 1.0]
+    blur: [0.0, 1.2]
+    moire_p: 0.3
+    gamma: [0.8, 1.2]
+    bright: [0.85, 1.15]
+    wb: 0.06
+    noise_std: [0, 8]
+    jpeg_q: [40, 92]
+val:
+  scheme: stratified
+  n_folds: 5
+  fold: 0
+  holdout_types: []
+train:
+  epochs: 10
+  lr: 0.001
+  weight_decay: 0.01
+  warmup_epochs: 1
+  amp: true
+  pos_weight: null
+  grad_clip: 1.0
+  early_stop_patience: 4
+  log_every: 200
+predict:
+  fill_value: 0.5
+  tta_hflip: false
+device: cuda
+gpu: 7

@@ -49,14 +49,17 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 |---|---|---|---|---|---|
 | 🥇 1 | 06 effb3 srm + recapture | 0.00018 | 0.00042 | **0.15185** | **best — SRM×recapture synergy, moderate aug** |
 | 2 | 10 fusion 2×06 + 1×07b | — | — | 0.15564 | fusion < 06 (07b correlated, weaker) |
-| 3 | 07b srm+recap 448 hi-res | 0.00022 | 0.00032 | 0.16440 | hi-res didn't help |
+| 3 | 11 G-AdaBN (06 ckpt + test-BN) | — | — | 0.15598 | test-time BN recompute ≈ no-op (06 already recap-trained) |
+| 4 | 11 G-Tent (06 ckpt, BN affine) | — | — | 0.15854 | entropy ~0 (overconfident) → drift, worse |
+| 5 | 07b srm+recap 448 hi-res | 0.00022 | 0.00032 | 0.16440 | hi-res didn't help |
 | 4 | 01 effb3 rgb       | 0.00013 | — | 0.17920 | prior best |
 | 5 | 05 effb3 rgb + recapture | 0.00012 | 0.00022 | 0.18433 | recapture **didn't help RGB** |
 | 6 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
 | 7 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
 | 8 | 08 rgb+srm+dct (+strong aug) | 0.00032 | 0.00063 | 0.24078 | DCT confounded by bad aug → see 09 |
 | 9 | 09 rgb+srm+dct FAIR (06 aug) | 0.00011 | 0.00021 | 0.21476 | **DCT stream genuinely hurts** (clean test) |
-| 10 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
+| 12 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
+| — | 12 F frozen CLIP/DINOv2 | 0.67 / 0.40 | — | (killed, not submitted) | **frozen semantic feats fail** — wrong signal family |
 | — | 04 ensemble (rank) | 01+02=0.000117 | — | (not submitted) | no in-domain gain |
 
 **Best still 0.15185 (attempt 06).** Session 2 (2026-06-25), all 5 subs spent, **everything regressed**:
@@ -64,6 +67,19 @@ stronger/wider aug (07a 0.19546), hi-res (07b 0.16440), DCT+bad-aug (08 0.24078)
 fusion (10 0.15564). → **06's moderate-aug SRM+recapture is a local optimum; neither hyperparameter
 pushes nor extra pixel streams (DCT) beat it. Next lever must change the signal family —
 field-consistency D / ROI crops.**
+
+**Session 3 (2026-06-27), directions G + F — both FAILED, 06 still champion:**
+- **G test-time adaptation** (AdaBN 0.15598, Tent 0.15854): re-aligning BN to the test domain at
+  inference does **not** help — 06's recapture-*aug training already broadened BN stats*, leaving no
+  slack; Tent's entropy is ~0 (overconfident model). [[attempts/11_tta_bn_tent]]
+- **F frozen foundation features** (CLIP linear / DINOv2 mlp): **killed at ep2**, in-domain FREUID
+  stuck 0.67 / 0.40 (vs 06's 0.00018). Frozen CLIP/DINOv2 encode **semantics** and discard the
+  **low-level forensic** signal (noise/JPEG-grid/recapture traces) ID-forgery needs. UnivFD precedent
+  is for *semantic* GAN/diffusion artifacts; physical+recapture ID forgery is a different family.
+  Confirms research §1 (effb3 full-finetune ≫ frozen ViT). [[attempts/12_frozen_foundation]]
+- **⇒ Both confirm the same lesson: the winning recipe is a FULL fine-tune of a CNN with a forensic
+  stream (SRM) + recapture aug. The remaining lever is a NEW signal family added late-fused —
+  field-consistency D / ROI crops — not backbone swaps or post-hoc adaptation.**
 - **Recapture aug helps SRM, not RGB**: 02→06 (0.18471→0.15185) improved; 01→05 (0.17920→0.18433)
   regressed. **Synergy (root finding #1):** the noise stream only pays off once the model sees the
   recapture domain; recapture aug only pays off if there's a forensic stream to exploit it.
@@ -90,8 +106,10 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 | 06 | [effb3 SRM + recapture](attempts/06_effb3_srm_recap.md) | **done · LB 0.15185 🥇** |
 | 07 | [push SRM×recapture (harder aug + hi-res)](attempts/07_srm_recap_push.md) | done · 07a 0.19546 / 07b 0.16440 |
 | 08 | [DCT block-frequency stream](attempts/08_dct_stream.md) | done · LB 0.24078 (confounded) |
-| 09 | [DCT-fair (06 moderate aug)](attempts/09_dct_fair.md) | pending |
+| 09 | [DCT-fair (06 moderate aug)](attempts/09_dct_fair.md) | done · LB 0.21476 |
 | 10 | [rank-fusion 06×07b](attempts/10_ensemble_06_07b.md) | done · LB 0.15564 |
+| 11 | [G test-time AdaBN + Tent](attempts/11_tta_bn_tent.md) | done · AdaBN 0.15598 / Tent 0.15854 |
+| 12 | [F frozen CLIP/DINOv2](attempts/12_frozen_foundation.md) | killed ep2 · not submitted (frozen feats fail) |
 
 ## Remaining directions (re-prioritized after finding #0)
 
@@ -105,16 +123,18 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 3. ~~Real recapture validation probe~~ → built (`freuid/probe.py`) but **also broken**: n=20 too
    small for FREUID, AUROC inverted vs LB. No local proxy ranks at the top. [[eval_harness]]
 
-**⇒ Next must change the SIGNAL FAMILY, not the knobs. Tomorrow's order ([[research/directions]] F–J):**
-1. **G — test-time BN / Tent** (cheapest, hours): recompute BN stats / entropy-min on the unlabeled
-   test batch to re-align 06 to the recapture domain. No retraining, bolt onto the 06 checkpoint.
-   Free insurance — do first.
-2. **F — frozen foundation features** (biggest OOD upside): frozen CLIP-ViT-L/14 or DINOv2-L +
-   light head (linear probe → LoRA). Precedent (UnivFD) literally generalizes to *unseen* generators
-   = the private-LB objective. ~1 day.
-3. **D — field-consistency / MRZ checks** (strongest orthogonal net-new, domain-gap-robust); fuse late.
-4. **I — operating-point hard-negative mining** (metric squeeze on APCER@1%BPCER) once a backbone wins.
-5. **H / J** (one-class on bona-fide · domain-adversarial) — hedges for unseen-type private LB if F/G plateau.
+**⇒ Next must change the SIGNAL FAMILY, not the knobs. Updated order ([[research/directions]]):**
+- ~~**G — test-time BN / Tent**~~ → DONE, FAILED (AdaBN 0.15598, Tent 0.15854). [[attempts/11_tta_bn_tent]]
+- ~~**F — frozen foundation features**~~ → DONE, FAILED (killed ep2, frozen semantic feats are the
+  wrong signal family for low-level ID forgery). [[attempts/12_frozen_foundation]]
+1. **D — field-consistency / MRZ checks** ← NOW TOP. Strongest orthogonal net-new, domain-gap-robust
+   (keys on semantic breakage, not camera artifacts). Late score-fuse with 06. Cost: OCR+MRZ infra.
+2. **ROI face/text crops** (YOLO/heuristic, research §6 biggest single jump) + **E max-aggregation**
+   (tampered region is tiny; global pooling dilutes it). Same-family-as-06 but adds spatial focus.
+3. **I — operating-point hard-negative mining** (metric squeeze on APCER@1%BPCER) — bolt onto 06.
+4. **H / J** (one-class on bona-fide · domain-adversarial) — hedges for unseen-type private LB.
+- **Backbone swaps are exhausted**: full-finetune effb3+SRM (06) beats frozen ViT (F) and post-hoc
+  BN adaptation (G). Stay with the CNN+forensic-stream recipe; add NEW signals late-fused.
 
 **Then:**
 - ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch

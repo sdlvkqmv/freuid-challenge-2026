@@ -142,5 +142,55 @@ class StreamModel(nn.Module):
         return self.backbone(torch.cat(parts, dim=1) if len(parts) > 1 else parts[0])
 
 
+class FrozenFoundation(nn.Module):
+    """Frozen foundation backbone (CLIP / DINOv2 ViT) + light trainable head.
+
+    Direction F (docs/research/directions): UnivFD precedent — a frozen CLIP-ViT-L/14
+    backbone + linear probe generalizes to *unseen* generators, which is exactly the
+    private-LB objective (2 unseen doc types). The pretrained prior is the OOD lever; we
+    only learn a cheap head on top. Backbone is permanently in eval mode and runs under
+    no_grad (no stochastic depth, no grad memory) regardless of model.train().
+
+    head: 'linear' (UnivFD) or 'mlp' (one hidden layer + GELU + dropout).
+    """
+
+    def __init__(self, cfg):
+        super().__init__()
+        self.backbone = timm.create_model(
+            cfg.model.name,
+            pretrained=cfg.model.pretrained,
+            num_classes=0,                     # feature extractor (pooled)
+            img_size=cfg.data.img_size,        # interpolate pos-embed (DINOv2 default 518)
+        )
+        for p in self.backbone.parameters():
+            p.requires_grad_(False)
+        self.backbone.eval()
+        feat = self.backbone.num_features
+        head = cfg.model.get("head", "linear")
+        drop = cfg.model.get("drop_rate", 0.0)
+        if head == "mlp":
+            hid = cfg.model.get("head_hidden", 512)
+            self.head = nn.Sequential(
+                nn.Dropout(drop), nn.Linear(feat, hid), nn.GELU(),
+                nn.Dropout(drop), nn.Linear(hid, 1),
+            )
+        elif head == "linear":
+            self.head = nn.Sequential(nn.Dropout(drop), nn.Linear(feat, 1))
+        else:
+            raise ValueError(f"unknown model.head: {head}")
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        self.backbone.eval()                   # keep backbone frozen/deterministic
+        return self
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        with torch.no_grad():
+            feat = self.backbone(x)
+        return self.head(feat)
+
+
 def build_model(cfg) -> nn.Module:
+    if cfg.model.get("frozen", False):
+        return FrozenFoundation(cfg)
     return StreamModel(cfg)

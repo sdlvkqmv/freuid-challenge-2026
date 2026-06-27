@@ -80,7 +80,9 @@ def build_transforms(cfg, train: bool, force_recapture: bool = False):
         if force_recapture and rc:
             probe = dict(rc); probe["prob"] = 1.0   # always-on for the diagnostic
             ops.append(RecaptureSim(probe))
-    ops += [transforms.ToTensor(), transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)]
+    mean = tuple(cfg.data.get("mean") or IMAGENET_MEAN)   # CLIP/DINOv2 use their own norm
+    std = tuple(cfg.data.get("std") or IMAGENET_STD)
+    ops += [transforms.ToTensor(), transforms.Normalize(mean, std)]
     return transforms.Compose(ops)
 
 
