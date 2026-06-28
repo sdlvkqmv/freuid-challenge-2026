@@ -59,7 +59,8 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 | 7 | 15 multicrop max-agg (06) | — | — | 0.18077 | spatial crop discards global recapture cue |
 | 8 | 14 I-OHEM (hard-neg, top50%) | 0.00013 | 0.00032 | 0.18855 | OHEM most aggressive → worst hard-neg variant |
 | 9 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
-| 10 | 18 recap-realism V2 (full) | 0.00015 | 0.00030 | 0.20846 | synthetic-realism overfit; **best recap-val→near-worst LB** |
+| 10 | 19 D face-consistency fusion (06+face) | — | — | 0.20334 | validated AUROC0.88 but **redundant with 06** (r=0.66) |
+| 11 | 18 recap-realism V2 (full) | 0.00015 | 0.00030 | 0.20846 | synthetic-realism overfit; **best recap-val→near-worst LB** |
 | 11 | 17 recap-realism V1 (chroma-moiré) | 0.00014 | 0.00034 | 0.21221 | faithful artifacts overfit synthetic domain |
 | 12 | 16 multicrop topk3-agg (06) | — | — | 0.21898 | finer grid + more crop-reliance → worse |
 | 8 | 08 rgb+srm+dct (+strong aug) | 0.00032 | 0.00063 | 0.24078 | DCT confounded by bad aug → see 09 |
@@ -126,6 +127,7 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 | 13/14 | [I hard-neg mining (focal/OHEM)](attempts/13_hardneg_mining.md) | done · focal 0.16161 / OHEM 0.18855 |
 | 15/16 | [E multicrop max-agg](attempts/15_multicrop_maxagg.md) | done · max 0.18077 / topk 0.21898 |
 | 17/18 | [recap-sim realism (chroma-moiré/ab/vignette)](attempts/17_recap_realism.md) | done · V1 0.21221 / V2 0.20846 |
+| 19 | [D face-consistency (main↔ghost)](attempts/19_face_consistency.md) | done · fusion 0.20334 (signal valid AUROC0.88 but redundant w/ 06) |
 
 ## Remaining directions (re-prioritized after finding #0)
 
@@ -150,21 +152,25 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 - ~~**Recapture-realism retrain**~~ → DONE, FAILED (V1 0.21221, V2 0.20846). Faithful synthetic
   artifacts OVERFIT the synthetic domain; 06's generic moderate aug is optimal. Also proved **recap-val
   is anti-correlated for aug changes** (V2 best recap-val → near-worst LB). [[attempts/17_recap_realism]]
-1. **D — field-consistency** (font/baseline/layout; MRZ weak — dataset is 4 DLs + 1 ID, DLs lack MRZ).
-   Orthogonal **non-pixel** signal, **domain-gap-robust** (keys on semantic breakage, not camera
-   artifacts) → THE one untried family that does NOT depend on the recapture texture 06 already owns.
-   Now the only high-EV lever left. Cost: OCR + layout infra (real build, next session).
-2. **Additive face-ROI stream** (research §6) — keeps global context (unlike failed multicrop),
-   late-fused. Lower priority: E shows global recapture cue dominates. Needs face-detector infra.
-- **🔴 9 CONSECUTIVE DIRECTIONS REGRESS vs 06** (07 pushes, 08/09 DCT, 10 fusion, 11 BN-adapt, 12
-  frozen ViT, 13/14 hard-neg, 15/16 multicrop, 17/18 realism). 06's moderate-aug effb3+SRM is an
-  extremely robust local optimum. **Every lever that touches pixels / the digital-domain model
-  overfits.** Anti-pattern confirmed: adding specificity (streams, realism, hard examples, frozen
-  semantic feats, spatial crops) all overfit; only generic moderate recapture aug generalizes.
-  → **STOP blind LB-probing** (each just re-confirms 06). The single remaining bet is the **non-pixel
-  field-consistency family (D)**, which is independent of the recapture domain gap; build it properly
-  (OCR + layout consistency) and late-fuse with 06. The LB top (~0.00063) implies such a fundamentally
-  different signal exists.
+- ~~**D — field-consistency (photo identity: main↔ghost)**~~ → DONE. Signal VALIDATED (Mauritius
+  AUROC 0.88, 95% cov) but **REDUNDANT with 06** (pearson 0.66; 06 already flags 90% of swaps at mean
+  score 0.88). Fusion regressed (0.20334) — injects the face signal's 12% error across 1,695 images to
+  recover only 26 swaps 06 missed. 06's SRM stream already detects photo substitution.
+  [[attempts/19_face_consistency]]
+1. **D — OCR date-logic** (issue≤expiry, DOB plausibility) — the one untried D sub-signal, universal
+   across types. BUT likely also redundant (field-value edits leave pixel traces 06 sees) + needs OCR
+   infra. Low EV after D-photo proved redundant.
+2. **Confident-only face boost** (push only incons>0.8 swaps up, never move others) — marginal, ceiling
+   ~26 test images. Cheap if revisited.
+- **🔴 10 CONSECUTIVE DIRECTIONS DO NOT BEAT 06** (07 pushes, 08/09 DCT, 10 fusion, 11 BN-adapt, 12
+  frozen ViT, 13/14 hard-neg, 15/16 multicrop, 17/18 realism, 19 face-consistency). Two confirmed
+  reasons: **(a)** adding specificity overfits (streams/realism/hard-neg/frozen/spatial all worsen);
+  **(b)** 06's SRM forensic stream is **more semantically complete than expected** — even an
+  orthogonal-by-design signal (face identity) is 65% correlated with it and adds nothing.
+  → The pixel-forensic + recapture-aug recipe has captured the accessible signal. **Beating 06 likely
+  needs a fundamentally different paradigm** (LB top ~0.00063 implies one exists), not another bolt-on.
+  Realistic options: **accept 06 as the final submission**, or a from-scratch domain-gap rethink
+  (train on genuinely real recapture data if obtainable). Stop bolt-on LB-probing.
 
 **Then:**
 - ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch
