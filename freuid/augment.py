@@ -36,6 +36,10 @@ class RecaptureSim:
         self.wb = c.get("wb", 0.06)                              # per-channel white-balance jitter
         self.noise_std = tuple(c.get("noise_std", [0.0, 8.0]))  # sensor noise (0-255 scale)
         self.jpeg_q = tuple(c.get("jpeg_q", [40, 92]))
+        # --- enhanced-realism cues (gated, default off; backward-compatible with 06) ---
+        self.chroma_moire = c.get("chroma_moire", False)        # per-channel multiplicative moiré
+        self.chroma_ab = c.get("chroma_ab", 0.0)                # chromatic aberration, max px radial shift
+        self.vignette = c.get("vignette", 0.0)                  # max radial darkening strength
 
     def __call__(self, img: Image.Image) -> Image.Image:
         a = np.asarray(img)
@@ -57,15 +61,23 @@ class RecaptureSim:
 
         x = np.asarray(img).astype(np.float32)
 
-        # 3. moiré beat pattern (camera sensor grid vs print raster)
+        # 3. moiré beat pattern (camera sensor grid vs print/display raster)
         if r.rand() < self.moire_p:
-            x = _moire(x, self.moire_amp, r)
+            x = _moire_chroma(x, self.moire_amp, r) if self.chroma_moire else _moire(x, self.moire_amp, r)
+
+        # 3b. chromatic aberration (lens dispersion: R/B fringe radially at edges)
+        if self.chroma_ab > 0:
+            x = _chroma_ab(x, int(round(r.uniform(0, self.chroma_ab))))
 
         # 4. illumination / gamma / white-balance (printer + camera response)
         g = r.uniform(*self.gamma)
         x = 255.0 * np.power(np.clip(x / 255.0, 0, 1), g)
         x *= r.uniform(*self.bright)
         x *= (1.0 + r.uniform(-self.wb, self.wb, size=3))[None, None, :]
+
+        # 4b. vignetting (lens light falloff toward corners)
+        if self.vignette > 0:
+            x = _vignette(x, r.uniform(0, self.vignette))
 
         # 5. sensor noise
         ns = r.uniform(*self.noise_std)
@@ -89,3 +101,42 @@ def _moire(x: np.ndarray, amp: float, r) -> np.ndarray:
     yy, xx = np.mgrid[0:h, 0:w]
     grid = np.sin(2 * np.pi * f * (xx * np.cos(theta) + yy * np.sin(theta)))
     return x + amp * grid[..., None]
+
+
+def _moire_chroma(x: np.ndarray, amp: float, r) -> np.ndarray:
+    """Per-channel MULTIPLICATIVE moiré — models the colored beat between the display
+    RGB subpixel layout and the camera sensor grid (a hallmark recapture artifact). Two
+    superimposed frequencies (display pitch + sensor pitch) with a per-channel phase shift."""
+    h, w = x.shape[:2]
+    f1, f2 = r.uniform(0.15, 0.5), r.uniform(0.15, 0.5)
+    t1, t2 = r.uniform(0, np.pi), r.uniform(0, np.pi)
+    yy, xx = np.mgrid[0:h, 0:w]
+    base1 = 2 * np.pi * f1 * (xx * np.cos(t1) + yy * np.sin(t1))
+    base2 = 2 * np.pi * f2 * (xx * np.cos(t2) + yy * np.sin(t2))
+    out = x.copy()
+    m = amp / 255.0                              # modulation depth
+    for c in range(3):
+        ph = r.uniform(0, 2 * np.pi)             # RGB subpixel offset
+        grid = 0.5 * (np.sin(base1 + ph) + np.sin(base2 + ph))
+        out[..., c] = x[..., c] * (1.0 + m * grid)
+    return out
+
+
+def _chroma_ab(x: np.ndarray, d: int) -> np.ndarray:
+    """Chromatic aberration: shift R/B channels oppositely (lens dispersion fringe)."""
+    if d <= 0:
+        return x
+    x = x.copy()
+    x[..., 0] = np.roll(x[..., 0], d, axis=1)
+    x[..., 2] = np.roll(x[..., 2], -d, axis=1)
+    return x
+
+
+def _vignette(x: np.ndarray, strength: float) -> np.ndarray:
+    """Radial light falloff toward the corners (camera lens vignetting)."""
+    h, w = x.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]
+    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
+    rad = np.sqrt(((xx - cx) / cx) ** 2 + ((yy - cy) / cy) ** 2) / np.sqrt(2.0)
+    factor = (1.0 - strength * rad ** 2)[..., None]
+    return x * factor

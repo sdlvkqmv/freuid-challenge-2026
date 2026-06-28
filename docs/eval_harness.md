@@ -90,6 +90,14 @@ submissions as the actual experiment loop; use proxies only to filter obvious fa
 
 ## Trusting the proxy
 
+- **🔴🔴 recap-val is ANTI-CORRELATED for augmentation changes — never use it to rank aug variants.**
+  recap-val applies the *same synthetic RecaptureSim* to the val set, so a model that overfits the
+  synthetic augmentation signature scores BEST on recap-val while scoring WORST on the real LB.
+  Measured (attempt 17/18): the full-realism aug had the **best recap-val of every run (0.00030)** and
+  a **near-worst LB (0.20846)**; 06's plain aug had a *worse* recap-val (0.00042) but the best LB
+  (0.15185). recap-val rewards synthetic-domain fit, which is exactly the overfitting that fails on
+  real recaptures. → For any change to the augmentation/sim, **only the public LB ranks**; ignore
+  recap-val entirely. (It remains a weak smoke-test that a model trained.) [[attempts/17_recap_realism]]
 - In-domain `stratified` proxy ≫ optimistic. Treat absolute numbers as upper bounds.
 - The honest proxy for the private LB is `group_holdout` (leave-one-type-out). When both are
   available, **rank methods by group_holdout**, not stratified.

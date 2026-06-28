@@ -59,7 +59,9 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 | 7 | 15 multicrop max-agg (06) | — | — | 0.18077 | spatial crop discards global recapture cue |
 | 8 | 14 I-OHEM (hard-neg, top50%) | 0.00013 | 0.00032 | 0.18855 | OHEM most aggressive → worst hard-neg variant |
 | 9 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
-| 10 | 16 multicrop topk3-agg (06) | — | — | 0.21898 | finer grid + more crop-reliance → worse |
+| 10 | 18 recap-realism V2 (full) | 0.00015 | 0.00030 | 0.20846 | synthetic-realism overfit; **best recap-val→near-worst LB** |
+| 11 | 17 recap-realism V1 (chroma-moiré) | 0.00014 | 0.00034 | 0.21221 | faithful artifacts overfit synthetic domain |
+| 12 | 16 multicrop topk3-agg (06) | — | — | 0.21898 | finer grid + more crop-reliance → worse |
 | 8 | 08 rgb+srm+dct (+strong aug) | 0.00032 | 0.00063 | 0.24078 | DCT confounded by bad aug → see 09 |
 | 9 | 09 rgb+srm+dct FAIR (06 aug) | 0.00011 | 0.00021 | 0.21476 | **DCT stream genuinely hurts** (clean test) |
 | 12 | 03 convnext rgb    | 0.18008 | — | 0.35407 | under-converged |
@@ -123,6 +125,7 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 | 12 | [F frozen CLIP/DINOv2](attempts/12_frozen_foundation.md) | killed ep2 · not submitted (frozen feats fail) |
 | 13/14 | [I hard-neg mining (focal/OHEM)](attempts/13_hardneg_mining.md) | done · focal 0.16161 / OHEM 0.18855 |
 | 15/16 | [E multicrop max-agg](attempts/15_multicrop_maxagg.md) | done · max 0.18077 / topk 0.21898 |
+| 17/18 | [recap-sim realism (chroma-moiré/ab/vignette)](attempts/17_recap_realism.md) | done · V1 0.21221 / V2 0.20846 |
 
 ## Remaining directions (re-prioritized after finding #0)
 
@@ -144,21 +147,24 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
   digital shortcut). [[attempts/13_hardneg_mining]]
 - ~~**E — multicrop max-agg (detector-free spatial focus)**~~ → DONE, FAILED (max 0.18077, topk
   0.21898). Spatial cropping discards the dominant *global* recapture cue. [[attempts/15_multicrop_maxagg]]
+- ~~**Recapture-realism retrain**~~ → DONE, FAILED (V1 0.21221, V2 0.20846). Faithful synthetic
+  artifacts OVERFIT the synthetic domain; 06's generic moderate aug is optimal. Also proved **recap-val
+  is anti-correlated for aug changes** (V2 best recap-val → near-worst LB). [[attempts/17_recap_realism]]
 1. **D — field-consistency** (font/baseline/layout; MRZ weak — dataset is 4 DLs + 1 ID, DLs lack MRZ).
    Orthogonal **non-pixel** signal, **domain-gap-robust** (keys on semantic breakage, not camera
-   artifacts) → the one untried family that does NOT depend on the recapture texture 06 already owns.
-   Now top. Cost: OCR + layout infra.
-2. **Recapture-realism retrain** — recapture aug is the ONLY lever that ever helped (06). 07a showed
-   *wider ranges* hurt, but *more physically faithful* sim (real screen moiré/subpixel, print
-   halftone, double-JPEG chains) is untried and directly closes the sim→real gap that dominates the LB.
-3. **Additive face-ROI stream** (research §6) — keeps global context (unlike the failed multicrop),
-   concatenated/late-fused. Lower priority: E's result shows the global recapture cue dominates, so
-   a localized stream may add little on the recapture-heavy public LB. Needs face-detector infra.
-- **Everything that reshapes/post-processes the same digital-domain model is EXHAUSTED**: backbone
-  swap (F), post-hoc BN adapt (G), loss reshaping (I), inference-time spatial agg (E) — all regress
-  vs 06 (8 directions). Two untried families remain: **non-pixel semantic consistency (D)** and
-  **better recapture-sim realism**. Keep 06 as the fraud-texture member; the LB top (~0.00063) implies
-  a fundamentally better domain-gap solution exists.
+   artifacts) → THE one untried family that does NOT depend on the recapture texture 06 already owns.
+   Now the only high-EV lever left. Cost: OCR + layout infra (real build, next session).
+2. **Additive face-ROI stream** (research §6) — keeps global context (unlike failed multicrop),
+   late-fused. Lower priority: E shows global recapture cue dominates. Needs face-detector infra.
+- **🔴 9 CONSECUTIVE DIRECTIONS REGRESS vs 06** (07 pushes, 08/09 DCT, 10 fusion, 11 BN-adapt, 12
+  frozen ViT, 13/14 hard-neg, 15/16 multicrop, 17/18 realism). 06's moderate-aug effb3+SRM is an
+  extremely robust local optimum. **Every lever that touches pixels / the digital-domain model
+  overfits.** Anti-pattern confirmed: adding specificity (streams, realism, hard examples, frozen
+  semantic feats, spatial crops) all overfit; only generic moderate recapture aug generalizes.
+  → **STOP blind LB-probing** (each just re-confirms 06). The single remaining bet is the **non-pixel
+  field-consistency family (D)**, which is independent of the recapture domain gap; build it properly
+  (OCR + layout consistency) and late-fuse with 06. The LB top (~0.00063) implies such a fundamentally
+  different signal exists.
 
 **Then:**
 - ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch
