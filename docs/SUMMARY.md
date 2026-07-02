@@ -53,12 +53,18 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 | 4 | 11 G-Tent (06 ckpt, BN affine) | — | — | 0.15854 | entropy ~0 (overconfident) → drift, worse |
 | 5 | 13 I-focal (hard-neg, gp2/gn3) | 0.00012 | 0.00033 | 0.16161 | hard-neg mining regresses (amplifies digital shortcut) |
 | 6 | 07b srm+recap 448 hi-res | 0.00022 | 0.00032 | 0.16440 | hi-res didn't help |
+| — | 24 ens 06:resnext50 3:1 | — | — | 0.17064 | diverse-backbone fuse regresses (effb3 uniquely OOD-robust) |
+| — | 25 ens 06:resnext50 2:1 | — | — | 0.17409 | " (monotonic in 06 weight → asymptotes to 06 from above) |
+| — | 23 ens 06+resnet50 equal | — | — | 0.17868 | " |
 | 4 | 01 effb3 rgb       | 0.00013 | — | 0.17920 | prior best |
 | 5 | 05 effb3 rgb + recapture | 0.00012 | 0.00022 | 0.18433 | recapture **didn't help RGB** |
 | 6 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
 | 7 | 15 multicrop max-agg (06) | — | — | 0.18077 | spatial crop discards global recapture cue |
 | 8 | 14 I-OHEM (hard-neg, top50%) | 0.00013 | 0.00032 | 0.18855 | OHEM most aggressive → worst hard-neg variant |
 | 9 | 07a srm+recap STRONG/WIDE | 0.00022 | 0.00058 | 0.19546 | **over-aug (prob0.85) hurts** |
+| — | 21 resnet50 srm+recap solo | 0.00000 | 0.00043 | 0.21612 | diverse backbone: fits digital identically, **generalizes worse to recapture** |
+| — | 22 resnext50 srm+recap solo | 0.00000 | 0.00053 | (in 24/25) | same family as r50 (spearman0.95); most decorrelated vs 06 (0.82) |
+| — | 20 T1 VLM zero-shot (Qwen2-VL-2B) | — | — | (not submitted) | **AUROC 0.4452 < random** — VLM can't judge these forgeries zero-shot |
 | 10 | 19 D face-consistency fusion (06+face) | — | — | 0.20334 | validated AUROC0.88 but **redundant with 06** (r=0.66) |
 | 11 | 18 recap-realism V2 (full) | 0.00015 | 0.00030 | 0.20846 | synthetic-realism overfit; **best recap-val→near-worst LB** |
 | 11 | 17 recap-realism V1 (chroma-moiré) | 0.00014 | 0.00034 | 0.21221 | faithful artifacts overfit synthetic domain |
@@ -128,6 +134,7 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 | 15/16 | [E multicrop max-agg](attempts/15_multicrop_maxagg.md) | done · max 0.18077 / topk 0.21898 |
 | 17/18 | [recap-sim realism (chroma-moiré/ab/vignette)](attempts/17_recap_realism.md) | done · V1 0.21221 / V2 0.20846 |
 | 19 | [D face-consistency (main↔ghost)](attempts/19_face_consistency.md) | done · fusion 0.20334 (signal valid AUROC0.88 but redundant w/ 06) |
+| 20-25 | [T1 VLM external-prior + T2 diverse-backbone ensemble](attempts/20_vlm_and_diverse_ensemble.md) | done · VLM AUROC0.44 (not sub) / ensemble 0.170-0.219 (**11th direction, effb3 carries OOD-robustness**) |
 
 ## Remaining directions (re-prioritized after finding #0)
 
@@ -162,15 +169,22 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
    infra. Low EV after D-photo proved redundant.
 2. **Confident-only face boost** (push only incons>0.8 swaps up, never move others) — marginal, ceiling
    ~26 test images. Cheap if revisited.
-- **🔴 10 CONSECUTIVE DIRECTIONS DO NOT BEAT 06** (07 pushes, 08/09 DCT, 10 fusion, 11 BN-adapt, 12
-  frozen ViT, 13/14 hard-neg, 15/16 multicrop, 17/18 realism, 19 face-consistency). Two confirmed
-  reasons: **(a)** adding specificity overfits (streams/realism/hard-neg/frozen/spatial all worsen);
-  **(b)** 06's SRM forensic stream is **more semantically complete than expected** — even an
-  orthogonal-by-design signal (face identity) is 65% correlated with it and adds nothing.
-  → The pixel-forensic + recapture-aug recipe has captured the accessible signal. **Beating 06 likely
-  needs a fundamentally different paradigm** (LB top ~0.00063 implies one exists), not another bolt-on.
-  Realistic options: **accept 06 as the final submission**, or a from-scratch domain-gap rethink
-  (train on genuinely real recapture data if obtainable). Stop bolt-on LB-probing.
+- **🔴 11 CONSECUTIVE DIRECTIONS DO NOT BEAT 06** (07 pushes, 08/09 DCT, 10 fusion, 11 BN-adapt, 12
+  frozen ViT, 13/14 hard-neg, 15/16 multicrop, 17/18 realism, 19 face-consistency, **20-25 VLM +
+  diverse-backbone ensemble**). Confirmed reasons: **(a)** adding specificity overfits
+  (streams/realism/hard-neg/frozen/spatial all worsen); **(b)** 06's SRM forensic stream is **more
+  semantically complete than expected** — even an orthogonal-by-design signal (face identity) is 65%
+  correlated with it and adds nothing; **(c)** [[attempts/20_vlm_and_diverse_ensemble]] — the
+  **backbone itself (effb3) carries the OOD-robustness**: resnet50/resnext50 on 06's EXACT recipe fit
+  the digital train identically (in-domain 0.0000) yet generalize far worse to recapture (solo 0.216 vs
+  0.152), so rank-fusion at any 06-weight regresses monotonically (0.179→0.171→0.170, asymptote 0.152
+  from above); **(d)** the external-prior escape hatch is also closed — a zero-shot VLM (Qwen2-VL-2B)
+  scores **AUROC 0.44 < random**, so world-knowledge can't substitute for forensic pixels either.
+  → The pixel-forensic + recapture-aug recipe has captured the accessible signal, AND the accessible
+  zero-shot external prior is too weak. **Beating 06 now needs new DATA or a fine-tuned strong VLM, not
+  a same-day bolt-on** (LB top ~0.00063 implies a gain exists). Realistic options: **accept 06 as the
+  final submission**, or a from-scratch domain-gap rethink (genuinely real recapture training data, or
+  fine-tune a 7B+ VLM on recapture). Stop bolt-on LB-probing.
 
 **Then:**
 - ROI face/text crops (YOLO, §6 biggest single jump) · diffusion reconstruction-error branch
