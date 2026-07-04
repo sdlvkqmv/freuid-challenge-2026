@@ -54,8 +54,12 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 | 5 | 13 I-focal (hard-neg, gp2/gn3) | 0.00012 | 0.00033 | 0.16161 | hard-neg mining regresses (amplifies digital shortcut) |
 | 6 | 07b srm+recap 448 hi-res | 0.00022 | 0.00032 | 0.16440 | hi-res didn't help |
 | — | 24 ens 06:resnext50 3:1 | — | — | 0.17064 | diverse-backbone fuse regresses (effb3 uniquely OOD-robust) |
+| — | 29 ens 06+effb3-seed123 | — | — | 0.17400 | **same-backbone reseed fuse also regresses** (reseeds worse solo) |
 | — | 25 ens 06:resnext50 2:1 | — | — | 0.17409 | " (monotonic in 06 weight → asymptotes to 06 from above) |
 | — | 23 ens 06+resnet50 equal | — | — | 0.17868 | " |
+| — | 28 ens 3× effb3 seeds (06+123+456) | — | — | 0.18088 | 3-way reseed fuse worse than 2-way (all reseeds worse than 06) |
+| — | 27 effb3 SEED456 solo | 0.00017 | 0.00009 | 0.19178 | **06's exact recipe, diff seed → 0.19 (06 is a lucky seed)** |
+| — | 26 effb3 SEED123 solo | 0.00009 | 0.00009 | 0.21497 | " → 0.21. recipe LB seed-variance 0.152-0.215; recap-val can't select |
 | 4 | 01 effb3 rgb       | 0.00013 | — | 0.17920 | prior best |
 | 5 | 05 effb3 rgb + recapture | 0.00012 | 0.00022 | 0.18433 | recapture **didn't help RGB** |
 | 6 | 02 effb3 rgb+srm   | 0.00011 | — | 0.18471 | SRM w/o recapture: no gain |
@@ -134,7 +138,7 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
 | 15/16 | [E multicrop max-agg](attempts/15_multicrop_maxagg.md) | done · max 0.18077 / topk 0.21898 |
 | 17/18 | [recap-sim realism (chroma-moiré/ab/vignette)](attempts/17_recap_realism.md) | done · V1 0.21221 / V2 0.20846 |
 | 19 | [D face-consistency (main↔ghost)](attempts/19_face_consistency.md) | done · fusion 0.20334 (signal valid AUROC0.88 but redundant w/ 06) |
-| 20-25 | [T1 VLM external-prior + T2 diverse-backbone ensemble](attempts/20_vlm_and_diverse_ensemble.md) | done · VLM AUROC0.44 (not sub) / ensemble 0.170-0.219 (**11th direction, effb3 carries OOD-robustness**) |
+| 20-29 | [T1 VLM external-prior + T2/T3 diverse & reseed ensembles](attempts/20_vlm_and_diverse_ensemble.md) | done · VLM AUROC0.44 (not sub) / ensembles 0.170-0.215 (**12th direction; 06 is a LUCKY SEED — recipe LB var 0.152-0.215**) |
 
 ## Remaining directions (re-prioritized after finding #0)
 
@@ -169,9 +173,19 @@ Computed by `freuid/metrics.py` on held-out val. Selection: lowest val FREUID. �
    infra. Low EV after D-photo proved redundant.
 2. **Confident-only face boost** (push only incons>0.8 swaps up, never move others) — marginal, ceiling
    ~26 test images. Cheap if revisited.
-- **🔴 11 CONSECUTIVE DIRECTIONS DO NOT BEAT 06** (07 pushes, 08/09 DCT, 10 fusion, 11 BN-adapt, 12
-  frozen ViT, 13/14 hard-neg, 15/16 multicrop, 17/18 realism, 19 face-consistency, **20-25 VLM +
-  diverse-backbone ensemble**). Confirmed reasons: **(a)** adding specificity overfits
+- **🔴🔴 06 IS A LUCKY SEED (new, highest-impact this session).** 06's exact recipe (effb3+SRM+recap)
+  re-trained at seeds 123 & 456 scored **0.21497 / 0.19178** on LB — vs 06's 0.15185. Identical
+  in-domain (0.0000) and *better* recap-val (0.00009 < 0.00042), yet far worse LB. So the recipe has a
+  **wide LB seed-variance band (~0.152-0.215)** and 06 sits at the lucky low end. **No local proxy
+  selects the good seed** (recap-val anti-correlated even across seeds; in-domain useless) → the good
+  seed is only findable by spending public-LB submissions. Two implications: reseed *ensembles* all
+  regress (members individually 0.19-0.21, drag the fuse to 0.174-0.181); and **06's 0.15185 is partly
+  public-LB luck** — on the private LB (142k, +2 unseen types) it may regress toward the band mean, so a
+  lower-variance effb3-reseed *ensemble* is a candidate hedge for the FINAL submission (revisit before
+  2026-07-14). [[attempts/20_vlm_and_diverse_ensemble]]
+- **🔴 12 CONSECUTIVE DIRECTIONS DO NOT BEAT 06** (07 pushes, 08/09 DCT, 10 fusion, 11 BN-adapt, 12
+  frozen ViT, 13/14 hard-neg, 15/16 multicrop, 17/18 realism, 19 face-consistency, **20-29 VLM +
+  diverse-backbone + reseed ensembles**). Confirmed reasons: **(a)** adding specificity overfits
   (streams/realism/hard-neg/frozen/spatial all worsen); **(b)** 06's SRM forensic stream is **more
   semantically complete than expected** — even an orthogonal-by-design signal (face identity) is 65%
   correlated with it and adds nothing; **(c)** [[attempts/20_vlm_and_diverse_ensemble]] — the

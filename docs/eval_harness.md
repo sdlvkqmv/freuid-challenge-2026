@@ -98,6 +98,13 @@ submissions as the actual experiment loop; use proxies only to filter obvious fa
   (0.15185). recap-val rewards synthetic-domain fit, which is exactly the overfitting that fails on
   real recaptures. → For any change to the augmentation/sim, **only the public LB ranks**; ignore
   recap-val entirely. (It remains a weak smoke-test that a model trained.) [[attempts/17_recap_realism]]
+- **🔴🔴 NO PROXY SELECTS THE SEED, and the recipe has huge LB seed-variance.** effb3+SRM+recap
+  (06's exact config) re-trained at seeds 123/456 scored **0.21497 / 0.19178** on LB vs 06 (seed42)
+  **0.15185** — a ~0.15-0.22 band. All three have identical in-domain (0.0000) and the reseeds even had
+  *better* recap-val (0.00009 < 06's 0.00042), yet worse LB. → recap-val anti-correlation holds at the
+  **seed** level too; the good seed is only identifiable by a public-LB submission. Corollary: 06's LB
+  is partly luck; a reseed *ensemble* is a lower-variance hedge for the private LB.
+  [[attempts/20_vlm_and_diverse_ensemble]]
 - In-domain `stratified` proxy ≫ optimistic. Treat absolute numbers as upper bounds.
 - The honest proxy for the private LB is `group_holdout` (leave-one-type-out). When both are
   available, **rank methods by group_holdout**, not stratified.
