@@ -130,6 +130,10 @@ class StreamModel(nn.Module):
             drop_rate=cfg.model.get("drop_rate", 0.0),
             drop_path_rate=cfg.model.get("drop_path_rate", 0.0),
         )
+        # trade compute for memory: lets large backbones (convnext_large etc.) fit the
+        # 10GB GPUs at usable batch size. timm exposes this on every supported backbone.
+        if cfg.model.get("grad_checkpointing", False):
+            self.backbone.set_grad_checkpointing(True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         parts = []

@@ -1,0 +1,67 @@
+# Attempt 28 — DATA/SCALE pivot: large backbone fine-tune.
+# Rationale: 11 bolt-ons on effb3 (12M) plateaued at LB 0.15185 while top teams sit
+# ~0.0004 (~390x gap). effb3 capacity likely caps the recapture-domain generalization.
+# Keep the winning 06 signal recipe UNCHANGED (SRM forensic stream + moderate recapture
+# aug) and only scale the backbone: effb3 -> convnext_large (198M, LayerNorm).
+# LayerNorm (not BN) => robust to the small batch the 10GB GPU forces.
+# grad_checkpointing + 320px + bs8 keep it inside 10GB.
+
+seed: 42
+
+paths:
+  # absolute: this run is launched from a git worktree that has no data/ or experiments/.
+  data_root: /data1/workspaces/jgshin22/FraudChallenge/data/extracted
+  exp_root: /data1/workspaces/jgshin22/FraudChallenge/experiments
+
+exp_name: attempt28_convnext_large_srm_recap
+
+model:
+  name: convnext_large.fb_in22k_ft_in1k
+  pretrained: true
+  drop_rate: 0.2
+  drop_path_rate: 0.2            # larger model -> a bit more stochastic depth
+  streams: [rgb, srm]           # forensic noise stream = the 06 recapture synergy lever
+  grad_checkpointing: true      # fit 198M backbone in 10GB
+
+data:
+  img_size: 384                 # match attempt06 resolution (isolate backbone as the only change)
+  batch_size: 16                # smoke: 4.45GB @384/bs12 -> bs16 ~6GB, safe in 10GB
+  num_workers: 12
+  rrc_scale: [0.7, 1.0]
+  hflip: false
+  color_jitter: 0.1
+  # EXACT attempt06 moderate recapture recipe (the local optimum for aug; do not touch)
+  recapture:
+    prob: 0.7
+    downscale: [0.5, 1.0]
+    blur: [0.0, 1.2]
+    moire_p: 0.3
+    gamma: [0.8, 1.2]
+    bright: [0.85, 1.15]
+    wb: 0.06
+    noise_std: [0, 8]
+    jpeg_q: [40, 92]
+
+val:
+  scheme: stratified
+  n_folds: 5
+  fold: 0
+  holdout_types: []
+
+train:
+  epochs: 8
+  lr: 8.0e-5                     # large backbone + small batch => lower lr than effb3's 3e-4
+  weight_decay: 0.05
+  warmup_epochs: 1
+  amp: true
+  pos_weight: null
+  grad_clip: 1.0
+  early_stop_patience: 3
+  log_every: 200
+
+predict:
+  fill_value: 0.5
+  tta_hflip: false
+
+device: cuda
+gpu: 5
