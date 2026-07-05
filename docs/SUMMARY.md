@@ -48,6 +48,7 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 | Rank (by LB) | Attempt | val FREUID (in-domain) | recap-val | **Kaggle public LB** | Notes |
 |---|---|---|---|---|---|
 | 🥇 1 | 06 effb3 srm + recapture | 0.00018 | 0.00042 | **0.15185** | **best — SRM×recapture synergy, moderate aug** |
+| — | 28 convnext_large(196M) srm+recap | 0.00026 | 0.00069 | 0.23531 | **SCALE REFUTED**: 16× params, in-domain=06, OOD WORST. capacity↔OOD inversion (memorizes digital shortcut harder). [[attempts/28_large_backbone]] |
 | 2 | 10 fusion 2×06 + 1×07b | — | — | 0.15564 | fusion < 06 (07b correlated, weaker) |
 | 3 | 11 G-AdaBN (06 ckpt + test-BN) | — | — | 0.15598 | test-time BN recompute ≈ no-op (06 already recap-trained) |
 | 4 | 11 G-Tent (06 ckpt, BN affine) | — | — | 0.15854 | entropy ~0 (overconfident) → drift, worse |
