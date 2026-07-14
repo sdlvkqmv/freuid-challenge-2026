@@ -4,10 +4,13 @@ FREUID Challenge 2026 - Reproducibility Package
 
 Team name: jgshin22
 Kaggle usernames: jgshin22
-Final Kaggle submission: [attempt31 MIL field-crop v2 + private-row inference / date-time as shown on Kaggle]
+Final Kaggle submission: sub_final_a31_private_filled.csv / 2026-07-14 15:51:40 UTC
+  (public rows identical to our 2026-07-08 submission scoring 0.03905;
+   private rows produced after the July 13 private release by inference with
+   the frozen checkpoint - no model, weight, or training-code changes)
 
 Repository (this should be public git repository): https://github.com/sdlvkqmv/freuid-challenge-2026
-Commit SHA: [40-char hash — fill after final commit]
+Commit SHA: [HEAD of main at reply time - see forum reply]
 Technical report (PDF): https://github.com/sdlvkqmv/freuid-challenge-2026/blob/main/submission/freuid_technical_report.pdf
 
 We confirm this repository at the stated commit reproduces our selected final
