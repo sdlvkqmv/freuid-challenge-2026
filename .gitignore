@@ -40,3 +40,7 @@ submissions/
 
 # Claude Code local
 .claude/
+
+# --- reproducibility package: frozen artifacts ARE tracked ---
+!assets/
+!assets/*

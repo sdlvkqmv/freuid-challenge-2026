@@ -1,0 +1,8 @@
+# keep the Docker build context tiny: only code + assets are needed
+data/
+experiments/
+docs/
+.git/
+.claude/
+*.zip
+out/

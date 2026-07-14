@@ -1,0 +1,215 @@
+% FREUID Challenge 2026 — Technical Report (team jgshin22)
+% Compile: tectonic freuid_technical_report.tex  (or pdflatex + bibtex)
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black, urlcolor=blue!60!black}
+
+\newcommand{\teamname}{jgshin22}
+\newcommand{\kaggleteam}{jgshin22}
+\newcommand{\contactemail}{2002ehdrl@gmail.com}
+\newcommand{\reportdate}{July 15, 2026}
+
+\title{%
+  \textbf{The FREUID Challenge 2026}\\[0.4em]
+  \large Technical Report --- Template-Aligned Field-Crop MIL Forensics
+}
+\author{Gyucheol Shin\\ \small \texttt{\contactemail}}
+\date{Report date: \reportdate}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We address binary detection of forged identity documents across five
+template-locked document types (four driving licences, one ID card; Latin and
+Arabic scripts) under the DET-based FREUID score (lower is better). Our key
+observation is that all documents of a type are pixel-aligned to a common
+template, while whole-image downsampling (e.g.\ to $384^2$) renders document
+text $\sim$10\,px tall, making character-level tampering physically invisible
+to a whole-image classifier. Our system therefore scores documents
+\emph{per field}: for each type we derive up to 13 field bounding boxes
+(photo, name, date fields, document number, MRZ, plus three static zones)
+from per-pixel variance templates over bona-fide images, cut the crops at
+native resolution, and score each crop with a shared EfficientNet-B3 fed
+channel-concatenated RGB and SRM noise-residual streams. The document fraud
+score is the maximum over crop scores (multiple-instance learning), with
+horizontal-flip test-time augmentation. Trained only on the official training
+set (ImageNet-initialised backbone), this single model improves the public
+leaderboard from 0.15185 (our best whole-image baseline) to \textbf{0.03905},
+a $3.9\times$ reduction. Code (MIT), frozen weights, and a no-network Docker
+container reproduce the submission end-to-end.
+\end{abstract}
+
+\noindent\textbf{Competition:} The FREUID Challenge 2026 (IJCAI-ECAI 2026)\\
+\textbf{Kaggle team:} \kaggleteam\\
+\textbf{Code:} \url{https://github.com/sdlvkqmv/freuid-challenge-2026}\\
+
+\section{Introduction}
+\label{sec:intro}
+The challenge asks for a continuous fraud score per document image; the
+metric, FREUID $=1-\mathrm{HM}(1-\mathrm{AuDET},\,1-\mathrm{APCER@1\%BPCER})$,
+is computed from the full DET curve, so ranking quality and the strict
+1\%-BPCER operating point matter while monotonic rescaling does not. The
+threat model mixes physical manipulation, generative-AI edits, and
+print-and-capture recapture~\cite{freuid2026}. The central practical
+difficulty is a train/test domain gap: near-perfect in-domain validation
+($\sim 10^{-4}$ FREUID) coexists with public-leaderboard scores two to three
+orders of magnitude worse, so local CV cannot rank candidate models.
+
+\section{Method}
+\label{sec:method}
+
+\subsection{Overview}
+Pipeline: (1) assign each test image a document type by 1024-bit
+difference-hash (dhash) nearest-neighbour matching against all 69{,}352
+training images (documents are template-locked, so this is near-perfect);
+(2) resize to the type's canonical resolution; (3) cut $K\le 13$ predefined
+field crops and resize each to $320^2$; (4) score every crop with a shared
+CNN; (5) document score $=\max_k \sigma(\text{logit}_k)$, averaged over two
+horizontal-flip views.
+
+\subsection{Template-aligned field boxes}
+Per type we compute per-pixel mean/standard-deviation templates over aligned
+bona-fide images. High-variance pixels localise per-document ink; horizontal
+dilation and vertical closing merge glyphs into field bands, and connected
+components give candidate boxes. We keep the portrait photo, up to nine field
+bands (name, dates, document number, MRZ, hologram areas), and three fixed
+static-background zones, padded by 3\% (\texttt{assets/field\_boxes\_v2.json}).
+
+\subsection{Model architecture}
+A single EfficientNet-B3 (timm \texttt{tf\_efficientnet\_b3}, ImageNet
+initialisation, $\sim$11M parameters) with 6 input channels: RGB plus a fixed
+3-channel SRM high-pass noise residual (Fridrich--Kodovsk\'y kernels). The
+scorer is shared across crops; a document is a bag of $K{=}13$ crop instances
+(missing boxes padded by repetition) and the document logit is the max over
+per-crop logits --- one tampered field suffices to make a document fraudulent.
+
+\subsection{Training objective and procedure}
+BCE-with-logits on the document logit with $\text{pos\_weight}=1.363$
+(class balance); AdamW, LR $3\times10^{-4}$ with one-epoch warmup and cosine
+decay, weight decay 0.05, 6 epochs, batch 3 documents (39 crops), AMP,
+gradient clipping 1.0, seed 42. Augmentation: horizontal flip (p=0.5) and
+ColorJitter(0.1); no random-resized-crop (it would break template alignment).
+Best-validation checkpoint (epoch 4) selected.
+
+\subsection{Score calibration}
+None. Submitted scores are raw sigmoid probabilities; the metric is invariant
+to monotonic transforms. A per-type rank normalisation was tried and
+\emph{regressed} the leaderboard (0.571), so no post-processing is applied.
+
+\section{Data}
+\label{sec:data}
+
+\subsection{FREUID training set}
+All 69{,}352 official training images; labels from
+\texttt{train\_labels.csv}. \texttt{is\_digital} is degenerate (69{,}332 of
+69{,}352 True) and unused. Stratified 5-fold split by
+(\texttt{label}$\times$\texttt{type}); fold 0 held out for validation.
+
+\subsection{External data and pre-trained models}
+No external data beyond FREUID and publicly licensed ImageNet-pretrained
+\texttt{timm} weights (Apache-2.0), used only for backbone initialisation at
+training time.
+
+\subsection{Validation strategy}
+In-domain validation saturates ($10^{-4}$--$10^{-7}$ FREUID) and does not
+track the leaderboard; model selection therefore used public-leaderboard
+submissions (30+ documented attempts, \texttt{docs/} in the repository).
+Private test labels were never used; private-row predictions were produced
+once, after the July 13 private release, with the frozen checkpoint.
+
+\section{Inference}
+\label{sec:inference}
+Exact command (also the Docker entrypoint):
+\texttt{python submission/prepare\_submission.py} with \texttt{/data} (flat
+image directory) and \texttt{/submissions} mounted. Steps: dhash type
+assignment $\rightarrow$ canonical resize $\rightarrow$ 13 field crops at
+$320^2$ $\rightarrow$ shared scorer $\rightarrow$ hflip-TTA max-aggregation.
+Batch 6 documents (78 crops); one 10\,GB GPU processes the 7{,}821 public
+images in a few minutes (CPU $\sim$20--30$\times$ slower). Output:
+\texttt{submission.csv} with \texttt{id,label}.
+
+\section{Results}
+\label{sec:results}
+
+\begin{table}[h]
+  \centering
+  \caption{Main results. Lower FREUID is better.}
+  \label{tab:results}
+  \begin{tabular}{lcc}
+    \toprule
+    Model & Local val FREUID & Public LB FREUID \\
+    \midrule
+    Whole-image EffB3+SRM+recapture-aug (best of 20+ variants) & $\sim10^{-4}$ & 0.15185 \\
+    Field-crop MIL v1 (K=10, 384px) & $\sim10^{-6}$ & 0.08023 \\
+    \textbf{Field-crop MIL v2 (K=13, 320px, hflip, static zones)} & $1.2\times10^{-7}$ & \textbf{0.03905} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Notable negative results (all public-LB verified): DCT input stream, frozen
+CLIP/DINOv2 probes, test-time BN adaptation, hard-negative mining, blind
+multi-crop aggregation, synthetic recapture-realism augmentation,
+face-consistency fusion, diverse-backbone and reseed ensembles of the
+whole-image model, per-type rank normalisation. The single change that broke
+the whole-image plateau was \emph{where the model looks} (native-resolution
+field crops with max aggregation), not the loss, stream set, or backbone.
+
+\section{Reproducibility}
+\label{sec:repro}
+\begin{itemize}[noitemsep]
+  \item \textbf{Repository:} \url{https://github.com/sdlvkqmv/freuid-challenge-2026} (MIT); the frozen commit SHA is stated in our Kaggle discussion reply.
+  \item \textbf{Docker:} \texttt{docker build -t freuid-repro:local -f submission/Dockerfile .} from the repo root; weights (43\,MB), field boxes, and dhash references are baked into the image (\texttt{assets/}, SHA-256 in \texttt{assets/CHECKSUMS.txt}).
+  \item \textbf{Dependencies:} Python 3.11, PyTorch 2.4.1, timm 1.0.27 (pinned in \texttt{submission/requirements.txt}); CUDA 12.1 optional.
+  \item \textbf{Runtime:} full public-test inference in minutes on one 10\,GB GPU; training $\sim$6\,h on the same GPU.
+  \item \textbf{Randomness:} seed 42 everywhere; cuDNN autotune enabled (training non-bitwise-deterministic; the frozen checkpoint removes this concern at inference).
+  \item \textbf{Network:} inference runs under \texttt{--network none}; no runtime downloads.
+\end{itemize}
+
+\section{Team and contributions}
+Solo entry: Gyucheol Shin (modelling, experimentation, engineering, writing),
+assisted by AI pair-programming tools for implementation and experiment
+management.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\appendix
+\section{Hyperparameters}
+\label{app:hparams}
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{ll}
+    \toprule
+    Hyperparameter & Value \\
+    \midrule
+    Crop size / count & $320^2$ / $K{=}13$ per document \\
+    Canonical sizes & BENIN,MAURITIUS $1585{\times}1000$; EGYPT $1387{\times}875$; GUINEA $1584{\times}1000$; MOZAMBIQUE $1000{\times}630$ \\
+    Batch size & 3 documents (39 crops) \\
+    Learning rate & $3\times10^{-4}$, 1-epoch warmup, cosine decay \\
+    Weight decay & 0.05 \\
+    Epochs & 6 (best-val = epoch 4) \\
+    Loss & BCE, pos\_weight 1.363 \\
+    Augmentation & hflip 0.5, ColorJitter 0.1 \\
+    TTA & horizontal flip (2 views) \\
+    Seed & 42 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\end{document}

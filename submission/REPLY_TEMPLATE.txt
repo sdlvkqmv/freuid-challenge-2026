@@ -1,0 +1,17 @@
+---
+FREUID Challenge 2026 - Reproducibility Package
+---
+
+Team name: jgshin22
+Kaggle usernames: jgshin22
+Final Kaggle submission: [attempt31 MIL field-crop v2 + private-row inference / date-time as shown on Kaggle]
+
+Repository (this should be public git repository): https://github.com/sdlvkqmv/freuid-challenge-2026
+Commit SHA: [40-char hash — fill after final commit]
+Technical report (PDF): https://github.com/sdlvkqmv/freuid-challenge-2026/blob/main/submission/freuid_technical_report.pdf
+
+We confirm this repository at the stated commit reproduces our selected final
+submission and complies with the competition rules.
+
+Signed (team captain): jgshin22
+Date (UTC): 2026-07-15

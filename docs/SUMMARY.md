@@ -47,7 +47,9 @@ Metric = **FREUID score** = `1 - HM(1-AuDET, 1-APCER@1%BPCER)` (DET-curve based,
 
 | Rank (by LB) | Attempt | val FREUID (in-domain) | recap-val | **Kaggle public LB** | Notes |
 |---|---|---|---|---|---|
-| 🥇 1 | 06 effb3 srm + recapture | 0.00018 | 0.00042 | **0.15185** | **best — SRM×recapture synergy, moderate aug** |
+| 🥇 1 | **31 MIL field-crop v2 (FINAL)** | 0.00000 @ep4 | — | **0.03905** | **champion — per-type field crops @320px, effb3+SRM shared scorer, max-agg, hflip aug+TTA, +3 static zones** → [[attempts/30_31_mil_fieldcrop]] |
+| 🥈 2 | 30 MIL field-crop v1 | ~0 | — | **0.08023** | field-crop MIL first cut (K≤10, no hflip/static) |
+| 3 | 06 effb3 srm + recapture | 0.00018 | 0.00042 | 0.15185 | best *whole-image* model — SRM×recapture synergy (a lucky seed; reseeds 0.19-0.21) |
 | — | 28 convnext_large(196M) srm+recap | 0.00026 | 0.00069 | 0.23531 | **SCALE REFUTED**: 16× params, in-domain=06, OOD WORST. capacity↔OOD inversion (memorizes digital shortcut harder). [[attempts/28_large_backbone]] |
 | 2 | 10 fusion 2×06 + 1×07b | — | — | 0.15564 | fusion < 06 (07b correlated, weaker) |
 | 3 | 11 G-AdaBN (06 ckpt + test-BN) | — | — | 0.15598 | test-time BN recompute ≈ no-op (06 already recap-trained) |
