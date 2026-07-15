@@ -130,7 +130,9 @@ In-domain validation saturates ($10^{-4}$--$10^{-7}$ FREUID) and does not
 track the leaderboard; model selection therefore used public-leaderboard
 submissions (30+ documented attempts, \texttt{docs/} in the repository).
 Private test labels were never used; private-row predictions were produced
-once, after the July 13 private release, with the frozen checkpoint.
+after the July 13 private release by inference with the frozen checkpoints
+(v2 primary, v1 as the second Kaggle final selection; no weight, architecture,
+or training-code changes).
 
 \section{Inference}
 \label{sec:inference}
@@ -155,7 +157,7 @@ images in a few minutes (CPU $\sim$20--30$\times$ slower). Output:
     Model & Local val FREUID & Public LB FREUID \\
     \midrule
     Whole-image EffB3+SRM+recapture-aug (best of 20+ variants) & $\sim10^{-4}$ & 0.15185 \\
-    Field-crop MIL v1 (K=10, 384px) & $\sim10^{-6}$ & 0.08023 \\
+    Field-crop MIL v1 (K=10, 256px; second final selection) & $\sim10^{-6}$ & 0.08023 \\
     \textbf{Field-crop MIL v2 (K=13, 320px, hflip, static zones)} & $1.2\times10^{-7}$ & \textbf{0.03905} \\
     \bottomrule
   \end{tabular}

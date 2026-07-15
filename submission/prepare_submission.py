@@ -2,7 +2,14 @@
 """
 FREUID Challenge 2026 — inference entrypoint (team submission).
 
-Pipeline (matches our final Kaggle submission, attempt31 "MIL field-crop v2"):
+Two frozen models are bundled; select with env FREUID_MODEL (default "a31"):
+  a31 - "MIL field-crop v2" (13 crops @320px, hflip TTA)  -> reproduces our
+        primary final submission (public LB 0.03905).
+  a30 - "MIL field-crop v1" (10 crops @256px, no TTA)     -> reproduces our
+        second final selection (public LB 0.08023).
+Both checkpoints were trained 2026-07-08, before the July 13 code freeze.
+
+Pipeline (identical for both models apart from the constants above):
   1. For every image in the flat data dir, compute a 1024-bit dhash.
   2. Assign a document type via nearest-neighbour Hamming match against the
      69,352 training-image hashes bundled in ``assets/train_dhash_refs.npz``
@@ -44,8 +51,13 @@ SUBMISSION_PATH = Path(os.environ.get("FREUID_SUBMISSION_PATH", OUTPUT_DIR / "su
 
 IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
 
-CROP = 320
-KMAX = 13
+MODELS = {
+    "a31": dict(crop=320, kmax=13, tta=True,  weights="best.pt",     boxes="field_boxes_v2.json"),
+    "a30": dict(crop=256, kmax=10, tta=False, weights="best_a30.pt", boxes="field_boxes_v1.json"),
+}
+MODEL = MODELS[os.environ.get("FREUID_MODEL", "a31")]
+CROP = MODEL["crop"]
+KMAX = MODEL["kmax"]
 CANON = {
     "BENIN/DL": (1000, 1585),
     "EGYPT/DL": (875, 1387),
@@ -161,9 +173,9 @@ def parse_args():
     p = argparse.ArgumentParser(description="Generate FREUID submission.csv")
     p.add_argument("--data-dir", type=Path, default=DATA_DIR)
     p.add_argument("--output", type=Path, default=SUBMISSION_PATH)
-    p.add_argument("--weights", type=Path, default=APP_DIR / "assets" / "best.pt")
+    p.add_argument("--weights", type=Path, default=APP_DIR / "assets" / MODEL["weights"])
     p.add_argument("--refs", type=Path, default=APP_DIR / "assets" / "train_dhash_refs.npz")
-    p.add_argument("--boxes", type=Path, default=APP_DIR / "assets" / "field_boxes_v2.json")
+    p.add_argument("--boxes", type=Path, default=APP_DIR / "assets" / MODEL["boxes"])
     p.add_argument("--batch", type=int, default=6)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--shard", type=int, default=0)
@@ -209,7 +221,8 @@ def main():
             x = x.to(device, non_blocking=True)
             with torch.autocast("cuda", enabled=device.type == "cuda"):
                 logits = model(x)
-                logits = 0.5 * (logits + model(torch.flip(x, dims=[-1])))  # hflip TTA
+                if MODEL["tta"]:
+                    logits = 0.5 * (logits + model(torch.flip(x, dims=[-1])))  # hflip TTA
                 doc = logits.max(dim=1).values
             scores.append(torch.sigmoid(doc).float().cpu().numpy())
             ids.extend(bid)

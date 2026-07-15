@@ -58,6 +58,13 @@ docker run --rm --network none \
 
 Writes `/submissions/submission.csv` with columns `id,label`
 (label = fraud score in [0,1], higher = more likely fraud).
+
+**Model selection.** `FREUID_MODEL=a31` (default) reproduces our primary
+final submission (public LB 0.03905). `docker run -e FREUID_MODEL=a30 ...`
+reproduces our second final selection (field-crop MIL v1: 10 crops @256px,
+no TTA; public LB 0.08023). Both checkpoints were trained on 2026-07-08,
+before the July 13 code freeze; post-release work was inference-only
+(private-row prediction with the frozen checkpoints).
 Everything needed at inference (weights, field boxes, dhash references) is
 baked into the image; no network access is used. The container runs on CPU;
 if the host passes `--gpus all` it uses CUDA automatically (recommended:
@@ -66,9 +73,10 @@ roughly 20-30x slower).
 
 ## Model weights
 
-`assets/best.pt` (43 MB) is committed to this repository. It is the
-best-validation checkpoint (epoch 4 of 6) of the single final training run
-(seed 42). SHA-256 is recorded in `assets/CHECKSUMS.txt`.
+`assets/best.pt` (43 MB) is the best-validation checkpoint (epoch 4 of 6)
+of the final v2 training run (seed 42); `assets/best_a30.pt` is the v1
+checkpoint (second final selection). SHA-256 hashes are recorded in
+`assets/CHECKSUMS.txt`.
 
 ## External data / pretrained models
 
