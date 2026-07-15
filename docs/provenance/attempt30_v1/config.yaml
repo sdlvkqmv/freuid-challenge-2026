@@ -1,0 +1,64 @@
+seed: 42
+paths:
+  data_root: data/extracted
+  exp_root: experiments
+exp_name: attempt06_effb3_srm_recap
+model:
+  name: tf_efficientnet_b3
+  pretrained: true
+  drop_rate: 0.2
+  drop_path_rate: 0.1
+  streams:
+  - rgb
+  - srm
+data:
+  img_size: 384
+  batch_size: 24
+  num_workers: 14
+  rrc_scale:
+  - 0.7
+  - 1.0
+  hflip: false
+  color_jitter: 0.1
+  recapture:
+    prob: 0.7
+    downscale:
+    - 0.5
+    - 1.0
+    blur:
+    - 0.0
+    - 1.2
+    moire_p: 0.3
+    gamma:
+    - 0.8
+    - 1.2
+    bright:
+    - 0.85
+    - 1.15
+    wb: 0.06
+    noise_std:
+    - 0
+    - 8
+    jpeg_q:
+    - 40
+    - 92
+val:
+  scheme: stratified
+  n_folds: 5
+  fold: 0
+  holdout_types: []
+train:
+  epochs: 6
+  lr: 0.0003
+  weight_decay: 0.05
+  warmup_epochs: 1
+  amp: true
+  pos_weight: null
+  grad_clip: 1.0
+  early_stop_patience: 3
+  log_every: 200
+predict:
+  fill_value: 0.5
+  tta_hflip: false
+device: cuda
+gpu: 0

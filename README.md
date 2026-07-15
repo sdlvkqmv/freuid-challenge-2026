@@ -63,8 +63,14 @@ Writes `/submissions/submission.csv` with columns `id,label`
 final submission (public LB 0.03905). `docker run -e FREUID_MODEL=a30 ...`
 reproduces our second final selection (field-crop MIL v1: 10 crops @256px,
 no TTA; public LB 0.08023). Both checkpoints were trained on 2026-07-08,
-before the July 13 code freeze; post-release work was inference-only
-(private-row prediction with the frozen checkpoints).
+before the July 13 code freeze (training logs archived under
+`docs/provenance/`); post-release work was inference-only (private-row
+prediction with the frozen checkpoints).
+
+Precision note: on a CUDA host (`--gpus all`) the container reproduces the
+submitted scores bit-exactly (inference ran under fp16 autocast). On CPU
+(fp32) scores differ by < 3e-4 absolute, which does not alter score ranking
+in any meaningful way for the DET-based metric.
 Everything needed at inference (weights, field boxes, dhash references) is
 baked into the image; no network access is used. The container runs on CPU;
 if the host passes `--gpus all` it uses CUDA automatically (recommended:
