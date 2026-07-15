@@ -15,6 +15,16 @@ Repository (this should be public git repository): https://github.com/sdlvkqmv/f
 Commit SHA: [fill with final HEAD of main]
 Technical report (PDF): https://github.com/sdlvkqmv/freuid-challenge-2026/blob/main/submission/freuid_technical_report.pdf
 
+Disclosure: this repository was first made public on July 14 (one day after
+the July 13 code-freeze date), because we only packaged the solution for
+release after the private-test drop. No model, weight, architecture, or
+training-code change occurred after the freeze: both selected checkpoints
+were trained on 2026-07-08, the public-test rows of both final submissions
+are bit-identical to our pre-freeze submissions of 2026-07-08 (verifiable
+from Kaggle submission timestamps and public scores 0.03905 / 0.08023),
+training logs and configs are archived under docs/provenance/, and
+checkpoint SHA-256 hashes are in assets/CHECKSUMS.txt.
+
 We confirm this repository at the stated commit reproduces our selected final
 submission and complies with the competition rules.
 
