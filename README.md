@@ -35,7 +35,7 @@ submission/
   prepare_submission.py  self-contained inference entrypoint (sandbox contract)
   Dockerfile             reproducibility container
   requirements.txt       pinned inference dependencies
-docs/                    experiment log (30+ attempts) and research notes
+docs/provenance/         training logs/configs of the two selected runs
 ```
 
 ## Docker (organizer verification)
